@@ -49,6 +49,8 @@ type View struct {
 	Name        string   `json:"name"`
 	TagFilter   []string `json:"tag_filter"`
 	Description *string  `json:"description"`
+	Scope       string   `json:"scope"`
+	CreatedByID string   `json:"created_by_id"`
 	InsertedAt  string   `json:"inserted_at"`
 	UpdatedAt   string   `json:"updated_at"`
 	DeletedAt   *string  `json:"deleted_at"`

@@ -82,7 +82,7 @@ func Item(w io.Writer, it *client.Item) {
 	fmt.Fprintln(w, it.Body)
 }
 
-// Views prints a view list.
+// Views prints a view list. Scope shown as a small tag.
 func Views(w io.Writer, list []client.View) {
 	if len(list) == 0 {
 		fmt.Fprintln(w, "(no views)")
@@ -93,13 +93,21 @@ func Views(w io.Writer, list []client.View) {
 		if len(v.TagFilter) > 0 {
 			filter = "  [" + strings.Join(v.TagFilter, ", ") + "]"
 		}
-		fmt.Fprintf(w, "%-24s  %s%s\n", v.Slug, v.Name, filter)
+		scope := v.Scope
+		if scope == "" {
+			scope = "?"
+		}
+		fmt.Fprintf(w, "%-24s  %-8s  %s%s\n", v.Slug, "("+scope+")", v.Name, filter)
 	}
 }
 
 // ViewWithItems prints a view plus its items.
 func ViewWithItems(w io.Writer, v *client.ViewWithItems) {
-	fmt.Fprintf(w, "# %s (%s)\n", v.View.Name, v.View.Slug)
+	scope := v.View.Scope
+	if scope == "" {
+		scope = "?"
+	}
+	fmt.Fprintf(w, "# %s (%s) — %s\n", v.View.Name, v.View.Slug, scope)
 	if len(v.View.TagFilter) > 0 {
 		fmt.Fprintf(w, "tag_filter: %s\n", strings.Join(v.View.TagFilter, ", "))
 	}

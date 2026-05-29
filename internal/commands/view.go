@@ -14,9 +14,9 @@ func newViewCmd(g *Globals) *cobra.Command {
 		Short: "Manage saved views",
 	}
 
-	cmd.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List saved views",
+		Short: "List saved views (yours + team, by default)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := g.WorkspaceSlug()
 			if err != nil {
@@ -26,7 +26,14 @@ func newViewCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			views, err := c.ListViews(cmd.Context(), ws)
+			scope := ""
+			if mineOnly, _ := cmd.Flags().GetBool("mine"); mineOnly {
+				scope = "personal"
+			}
+			if teamOnly, _ := cmd.Flags().GetBool("team"); teamOnly {
+				scope = "team"
+			}
+			views, err := c.ListViews(cmd.Context(), ws, client.ListViewsParams{Scope: scope})
 			if err != nil {
 				return err
 			}
@@ -36,7 +43,10 @@ func newViewCmd(g *Globals) *cobra.Command {
 			output.Views(cmd.OutOrStdout(), views)
 			return nil
 		},
-	})
+	}
+	listCmd.Flags().Bool("mine", false, "only personal views you created")
+	listCmd.Flags().Bool("team", false, "only team views")
+	cmd.AddCommand(listCmd)
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "get <slug>",
@@ -98,10 +108,11 @@ func newViewCreateCmd(g *Globals) *cobra.Command {
 		name        string
 		tagFilter   []string
 		description string
+		share       bool
 	)
 	cmd := &cobra.Command{
 		Use:   "create <slug>",
-		Short: "Create a saved view",
+		Short: "Create a saved view (personal by default; --share to make it a team view)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
@@ -124,6 +135,11 @@ func newViewCreateCmd(g *Globals) *cobra.Command {
 				d := description
 				req.Description = &d
 			}
+			if share {
+				req.Scope = "team"
+			} else {
+				req.Scope = "personal"
+			}
 			v, err := c.CreateView(cmd.Context(), ws, req)
 			if err != nil {
 				return err
@@ -131,13 +147,14 @@ func newViewCreateCmd(g *Globals) *cobra.Command {
 			if g.JSONOut {
 				return output.JSON(cmd.OutOrStdout(), v)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "created view: %s\n", v.Slug)
+			fmt.Fprintf(cmd.OutOrStdout(), "created view: %s (%s)\n", v.Slug, v.Scope)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "human label (required)")
 	cmd.Flags().StringSliceVar(&tagFilter, "tag", nil, "tag in the filter (repeatable)")
 	cmd.Flags().StringVar(&description, "description", "", "description")
+	cmd.Flags().BoolVar(&share, "share", false, "make this a team view (visible to everyone in the workspace)")
 	return cmd
 }
 
@@ -146,12 +163,17 @@ func newViewEditCmd(g *Globals) *cobra.Command {
 		name       string
 		addTags    []string
 		removeTags []string
+		share      bool
+		unshare    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "edit <slug>",
-		Short: "Edit a saved view",
+		Short: "Edit a saved view (--share to promote to team, --unshare to demote to personal)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if share && unshare {
+				return fmt.Errorf("--share and --unshare are mutually exclusive")
+			}
 			ws, err := g.WorkspaceSlug()
 			if err != nil {
 				return err
@@ -173,6 +195,14 @@ func newViewEditCmd(g *Globals) *cobra.Command {
 				merged := mergeTags(cur.View.TagFilter, addTags, removeTags)
 				req.TagFilter = &merged
 			}
+			if share {
+				s := "team"
+				req.Scope = &s
+			}
+			if unshare {
+				s := "personal"
+				req.Scope = &s
+			}
 			v, err := c.UpdateView(cmd.Context(), ws, args[0], req)
 			if err != nil {
 				return err
@@ -180,12 +210,14 @@ func newViewEditCmd(g *Globals) *cobra.Command {
 			if g.JSONOut {
 				return output.JSON(cmd.OutOrStdout(), v)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "updated view: %s\n", v.Slug)
+			fmt.Fprintf(cmd.OutOrStdout(), "updated view: %s (%s)\n", v.Slug, v.Scope)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "new name")
 	cmd.Flags().StringSliceVar(&addTags, "add-tag", nil, "tag to add (repeatable)")
 	cmd.Flags().StringSliceVar(&removeTags, "remove-tag", nil, "tag to remove (repeatable)")
+	cmd.Flags().BoolVar(&share, "share", false, "promote to team view (visible to all members)")
+	cmd.Flags().BoolVar(&unshare, "unshare", false, "demote to personal view (only you)")
 	return cmd
 }

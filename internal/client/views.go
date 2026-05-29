@@ -1,13 +1,25 @@
 package client
 
-import "context"
+import (
+	"context"
+	"net/url"
+)
 
-// ListViews lists all views in a workspace.
-func (c *Client) ListViews(ctx context.Context, workspace string) ([]View, error) {
+// ListViewsParams encodes optional query params for ListViews.
+type ListViewsParams struct {
+	Scope string // "personal", "team", or "" for both
+}
+
+// ListViews lists all views visible to the caller in a workspace.
+func (c *Client) ListViews(ctx context.Context, workspace string, p ListViewsParams) ([]View, error) {
+	q := url.Values{}
+	if p.Scope != "" {
+		q.Set("scope", p.Scope)
+	}
 	var out struct {
 		Views []View `json:"views"`
 	}
-	if err := c.Do(ctx, "GET", "/api/workspaces/"+workspace+"/views", nil, nil, &out); err != nil {
+	if err := c.Do(ctx, "GET", "/api/workspaces/"+workspace+"/views", q, nil, &out); err != nil {
 		return nil, err
 	}
 	return out.Views, nil
@@ -28,6 +40,7 @@ type CreateViewRequest struct {
 	Name        string   `json:"name"`
 	TagFilter   []string `json:"tag_filter"`
 	Description *string  `json:"description,omitempty"`
+	Scope       string   `json:"scope,omitempty"`
 }
 
 // CreateView creates a new saved view.
@@ -47,6 +60,7 @@ type UpdateViewRequest struct {
 	Name        *string   `json:"name,omitempty"`
 	TagFilter   *[]string `json:"tag_filter,omitempty"`
 	Description *string   `json:"description,omitempty"`
+	Scope       *string   `json:"scope,omitempty"`
 }
 
 // UpdateView applies a partial update.
