@@ -118,6 +118,38 @@ func ViewWithItems(w io.Writer, v *client.ViewWithItems) {
 	Items(w, v.Items)
 }
 
+// Thread prints a list of messages in chronological order.
+func Thread(w io.Writer, msgs []client.Message) {
+	if len(msgs) == 0 {
+		fmt.Fprintln(w, "(no replies yet)")
+		return
+	}
+	for i, m := range msgs {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		author := m.Author.Username
+		if author == "" {
+			author = "?"
+		}
+		edited := ""
+		if m.EditedAt != nil && *m.EditedAt != "" {
+			edited = " (edited)"
+		}
+		fmt.Fprintf(w, "%s · %s · %s%s\n", author, shortID(m.ID), m.InsertedAt, edited)
+		for _, line := range strings.Split(m.Body, "\n") {
+			fmt.Fprintf(w, "  %s\n", line)
+		}
+	}
+}
+
+func shortID(id string) string {
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
+}
+
 // View prints a single view's metadata.
 func View(w io.Writer, v *client.View) {
 	fmt.Fprintf(w, "%s\t%s\n", v.Slug, v.Name)

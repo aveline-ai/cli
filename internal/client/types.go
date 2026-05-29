@@ -67,3 +67,16 @@ type ViewWithItems struct {
 	View  View   `json:"view"`
 	Items []Item `json:"items"`
 }
+
+// Message is a single thread reply on an item.
+type Message struct {
+	ID         string  `json:"id"`
+	ItemID     string  `json:"item_id"`
+	Body       string  `json:"body"`
+	Author     UserRef `json:"author"`
+	CreatedVia string  `json:"created_via"`
+	EditedAt   *string `json:"edited_at"`
+	InsertedAt string  `json:"inserted_at"`
+	UpdatedAt  string  `json:"updated_at"`
+	DeletedAt  *string `json:"deleted_at"`
+}

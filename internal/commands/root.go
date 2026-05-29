@@ -91,6 +91,10 @@ func NewRoot() (*cobra.Command, *Globals) {
 		newDeleteCmd(g),
 		newRestoreCmd(g),
 		newViewCmd(g),
+		newReplyCmd(g),
+		newThreadCmd(g),
+		newDeleteReplyCmd(g),
+		newEditReplyCmd(g),
 	)
 	return root, g
 }
