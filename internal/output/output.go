@@ -1,162 +1,87 @@
-// Package output formats command results for either human consumption or
-// raw JSON (--json), which Claude uses for machine parsing.
+// Package output handles success / failure rendering for every CLI verb.
+//
+// The CLI is agent-first: JSON is the default. The agent reads
+// stdout directly; humans can pass --human at the cobra layer.
+//
+// On failure, the API's error envelope is rendered verbatim to STDERR
+// and the process exits non-zero. The format is the same as the API
+// returns:
+//
+//	{"ok": false, "error": {"code": "...", "message": "..."}}
+//
+// so an agent can branch on the exit code, then parse stderr for the
+// machine-readable code.
 package output
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
+	"os"
 
-	"github.com/aveline-ai/cli/internal/client"
+	"github.com/aveline-ai/cli/internal/api"
 )
 
-// JSON marshals v as indented JSON to w.
-func JSON(w io.Writer, v any) error {
+// PrintSuccess writes the raw envelope bytes returned by the API to
+// stdout, exactly as the server sent them.
+func PrintSuccess(raw []byte) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	// Always emit a trailing newline so it composes with `| jq` etc.
+	if _, err := os.Stdout.Write(raw); err != nil {
+		return err
+	}
+	if raw[len(raw)-1] != '\n' {
+		fmt.Fprintln(os.Stdout)
+	}
+	return nil
+}
+
+// PrintError emits the failure envelope to STDERR and returns a usable
+// exit code. The agent gets the same JSON shape it would have from
+// curl. We never log retry hints — those go in the API's `error.message`.
+func PrintError(err *api.Error) int {
+	if err == nil {
+		return 0
+	}
+	emit := map[string]any{
+		"ok": false,
+		"error": map[string]any{
+			"code":    err.Code,
+			"message": err.Message,
+		},
+	}
+	if err.Details != nil && len(err.Details) > 0 {
+		emit["error"].(map[string]any)["details"] = err.Details
+	}
+	b, _ := json.Marshal(emit)
+	fmt.Fprintln(os.Stderr, string(b))
+
+	// Status-based exit code makes the agent able to branch in shell:
+	// 0 = success, 2 = validation/business error, 3 = auth, 4 = not
+	// found, 1 = anything else (network, encoding).
+	switch err.HTTPStatus {
+	case 401, 403:
+		return 3
+	case 404:
+		return 4
+	case 422:
+		return 2
+	default:
+		return 1
+	}
+}
+
+// HumanWriter writes pretty-printed JSON for the --human flag. We don't
+// have a full TUI yet; pretty-print is the human escape hatch.
+func PrintHuman(w io.Writer, raw []byte) error {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		_, err = w.Write(raw)
+		return err
+	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
-}
-
-// Me prints the user + workspaces human-style.
-func Me(w io.Writer, me *client.MeResponse) {
-	name := me.User.Username
-	if me.User.DisplayName != nil && *me.User.DisplayName != "" {
-		name = *me.User.DisplayName + " (" + me.User.Username + ")"
-	}
-	fmt.Fprintf(w, "%s <%s>\n", name, me.User.Email)
-	if len(me.Workspaces) == 0 {
-		fmt.Fprintln(w, "  (no workspaces)")
-		return
-	}
-	fmt.Fprintln(w, "workspaces:")
-	for _, ws := range me.Workspaces {
-		fmt.Fprintf(w, "  %s  %s\n", ws.Slug, ws.Name)
-	}
-}
-
-// Workspaces prints a workspace list.
-func Workspaces(w io.Writer, list []client.Workspace) {
-	if len(list) == 0 {
-		fmt.Fprintln(w, "(no workspaces)")
-		return
-	}
-	for _, ws := range list {
-		fmt.Fprintf(w, "%-24s  %s\n", ws.Slug, ws.Name)
-	}
-}
-
-// Items prints an item list.
-func Items(w io.Writer, items []client.Item) {
-	if len(items) == 0 {
-		fmt.Fprintln(w, "(no items)")
-		return
-	}
-	for _, it := range items {
-		pin := " "
-		if it.Pinned {
-			pin = "*"
-		}
-		tags := ""
-		if len(it.Tags) > 0 {
-			tags = "  [" + strings.Join(it.Tags, ", ") + "]"
-		}
-		fmt.Fprintf(w, "%s %-32s  %s%s\n", pin, it.Slug, it.Title, tags)
-	}
-}
-
-// Item prints item metadata followed by the body (matching `aveline get`).
-func Item(w io.Writer, it *client.Item) {
-	fmt.Fprintf(w, "# %s\n", it.Title)
-	fmt.Fprintf(w, "slug: %s\n", it.Slug)
-	if len(it.Tags) > 0 {
-		fmt.Fprintf(w, "tags: %s\n", strings.Join(it.Tags, ", "))
-	}
-	if it.Pinned {
-		fmt.Fprintln(w, "pinned: true")
-	}
-	if it.Summary != nil && *it.Summary != "" {
-		fmt.Fprintf(w, "summary: %s\n", *it.Summary)
-	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, it.Body)
-}
-
-// Views prints a view list. Scope shown as a small tag.
-func Views(w io.Writer, list []client.View) {
-	if len(list) == 0 {
-		fmt.Fprintln(w, "(no views)")
-		return
-	}
-	for _, v := range list {
-		filter := ""
-		if len(v.TagFilter) > 0 {
-			filter = "  [" + strings.Join(v.TagFilter, ", ") + "]"
-		}
-		scope := v.Scope
-		if scope == "" {
-			scope = "?"
-		}
-		fmt.Fprintf(w, "%-24s  %-8s  %s%s\n", v.Slug, "("+scope+")", v.Name, filter)
-	}
-}
-
-// ViewWithItems prints a view plus its items.
-func ViewWithItems(w io.Writer, v *client.ViewWithItems) {
-	scope := v.View.Scope
-	if scope == "" {
-		scope = "?"
-	}
-	fmt.Fprintf(w, "# %s (%s) — %s\n", v.View.Name, v.View.Slug, scope)
-	if len(v.View.TagFilter) > 0 {
-		fmt.Fprintf(w, "tag_filter: %s\n", strings.Join(v.View.TagFilter, ", "))
-	}
-	if v.View.Description != nil && *v.View.Description != "" {
-		fmt.Fprintf(w, "description: %s\n", *v.View.Description)
-	}
-	fmt.Fprintln(w)
-	Items(w, v.Items)
-}
-
-// Thread prints a list of messages in chronological order.
-func Thread(w io.Writer, msgs []client.Message) {
-	if len(msgs) == 0 {
-		fmt.Fprintln(w, "(no replies yet)")
-		return
-	}
-	for i, m := range msgs {
-		if i > 0 {
-			fmt.Fprintln(w)
-		}
-		author := m.Author.Username
-		if author == "" {
-			author = "?"
-		}
-		edited := ""
-		if m.EditedAt != nil && *m.EditedAt != "" {
-			edited = " (edited)"
-		}
-		fmt.Fprintf(w, "%s · %s · %s%s\n", author, shortID(m.ID), m.InsertedAt, edited)
-		for _, line := range strings.Split(m.Body, "\n") {
-			fmt.Fprintf(w, "  %s\n", line)
-		}
-	}
-}
-
-func shortID(id string) string {
-	if len(id) >= 8 {
-		return id[:8]
-	}
-	return id
-}
-
-// View prints a single view's metadata.
-func View(w io.Writer, v *client.View) {
-	fmt.Fprintf(w, "%s\t%s\n", v.Slug, v.Name)
-	if len(v.TagFilter) > 0 {
-		fmt.Fprintf(w, "tag_filter: %s\n", strings.Join(v.TagFilter, ", "))
-	}
-	if v.Description != nil && *v.Description != "" {
-		fmt.Fprintf(w, "description: %s\n", *v.Description)
-	}
 }

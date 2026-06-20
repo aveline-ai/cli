@@ -1,12 +1,13 @@
-// Command aveline is the CLI entrypoint.
+// Command aveline is the Aveline CLI entrypoint.
 package main
 
 import (
-	"os"
-
-	"github.com/aveline-ai/cli/internal/commands"
+	"github.com/aveline-ai/cli/internal/cmd"
 )
 
+// version is overridden at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 func main() {
-	os.Exit(commands.Execute())
+	cmd.Execute(version)
 }
