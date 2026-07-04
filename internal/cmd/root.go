@@ -95,6 +95,7 @@ found, 1 = network / other).`,
 	root.AddCommand(createTagCmd())
 	root.AddCommand(editTagCmd())
 	root.AddCommand(deleteTagCmd())
+	root.AddCommand(restoreTagCmd())
 
 	// Team
 	root.AddCommand(listMembersCmd())
