@@ -66,8 +66,11 @@ found, 1 = network / other).`,
 	// Docs
 	root.AddCommand(listDocsCmd())
 	root.AddCommand(getDocCmd())
+	root.AddCommand(getOrientationCmd())
 	root.AddCommand(createDocCmd())
 	root.AddCommand(applyOpsCmd())
+	root.AddCommand(pinDocCmd())
+	root.AddCommand(unpinDocCmd())
 	root.AddCommand(deleteDocCmd())
 	root.AddCommand(restoreDocCmd())
 	root.AddCommand(kudosDocCmd())
@@ -92,6 +95,7 @@ found, 1 = network / other).`,
 	root.AddCommand(createTagCmd())
 	root.AddCommand(editTagCmd())
 	root.AddCommand(deleteTagCmd())
+	root.AddCommand(restoreTagCmd())
 
 	// Team
 	root.AddCommand(listMembersCmd())

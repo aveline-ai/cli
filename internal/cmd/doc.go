@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,19 +9,26 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aveline-ai/cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
 func listDocsCmd() *cobra.Command {
 	var (
-		pinned bool
-		tags   []string
+		tags []string
+		has  []string
 	)
 
 	c := &cobra.Command{
-		Use:          "list-docs",
-		Short:        "List docs in the current workspace.",
-		Example:      `  aveline list-docs --tag runbook --pinned`,
+		Use:   "list-docs",
+		Short: "List docs in the current workspace.",
+		Long: `List docs in the current workspace.
+
+--has filters by structural kind: "links" (doc contains doc_link
+blocks — a trail) or "board" (doc contains a board block — a kanban).
+Repeatable; multiple values AND together.`,
+		Example: `  aveline list-docs --tag runbook
+  aveline list-docs --has board`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
@@ -33,19 +41,15 @@ func listDocsCmd() *cobra.Command {
 			}
 
 			q := url.Values{}
-			if cmd.Flags().Changed("pinned") {
-				if pinned {
-					q.Set("pinned", "true")
-				} else {
-					q.Set("pinned", "false")
-				}
-			}
 			// Send as CSV. Phoenix's default URL-encoded parser
 			// drops earlier values for repeated keys, so
 			// `?tag=x&tag=y` becomes `tag=y` server-side. CSV
 			// round-trips reliably.
 			if len(tags) > 0 {
 				q.Set("tag", strings.Join(tags, ","))
+			}
+			if len(has) > 0 {
+				q.Set("has", strings.Join(has, ","))
 			}
 
 			ctx, cancel := withTimeout()
@@ -55,15 +59,25 @@ func listDocsCmd() *cobra.Command {
 		},
 	}
 
-	c.Flags().BoolVar(&pinned, "pinned", false, "Filter to pinned docs only.")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
+	c.Flags().StringSliceVar(&has, "has", nil, "Filter by kind: links | board (repeatable).")
 	return c
 }
 
 func getDocCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:          "get-doc <slug>",
-		Short:        "Show a doc with full block body.",
+	var follow bool
+
+	c := &cobra.Command{
+		Use:   "get-doc <slug>",
+		Short: "Show a doc with full block body.",
+		Long: `Show a doc with full block body.
+
+--follow expands doc_link blocks: every linked doc's full body is
+fetched, in chain order, and returned under "linked_docs". One level
+deep only — links inside linked docs are not expanded. A stop whose
+doc was deleted appears as {"deleted": true, ...} instead of a body.`,
+		Example: `  aveline get-doc oncall-runbook
+  aveline get-doc onboarding-story --follow`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -79,16 +93,129 @@ func getDocCmd() *cobra.Command {
 			defer cancel()
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/docs/%s", ws, args[0]), nil)
-			return handle(raw, apiErr)
+			if apiErr != nil || !follow {
+				return handle(raw, apiErr)
+			}
+			combined, apiErr := followDocLinks(ctx, client, ws, raw)
+			return handle(combined, apiErr)
 		},
 	}
+
+	c.Flags().BoolVar(&follow, "follow", false,
+		"Also fetch every doc_link target's full body, in order (one level deep).")
+	return c
+}
+
+func getOrientationCmd() *cobra.Command {
+	var follow bool
+
+	c := &cobra.Command{
+		Use:   "get-orientation",
+		Short: "Show the workspace orientation doc — how this workspace uses Aveline.",
+		Long: `Show the workspace orientation doc: what lives in this workspace and
+how the team works. Every workspace has one (well-known slug, seeded at
+creation, undeletable).
+
+If you're an agent starting a session in an unfamiliar workspace, run
+this FIRST — with --follow to also pull the docs it links to, in order.`,
+		Example:      `  aveline get-orientation --follow`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Get(ctx,
+				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
+			if apiErr != nil || !follow {
+				return handle(raw, apiErr)
+			}
+			combined, apiErr := followDocLinks(ctx, client, ws, raw)
+			return handle(combined, apiErr)
+		},
+	}
+
+	c.Flags().BoolVar(&follow, "follow", false,
+		"Also fetch every doc_link target's full body, in order (one level deep).")
+	return c
+}
+
+// followDocLinks walks the doc's doc_link blocks in order and fetches
+// each target's full body, re-emitting the envelope with a
+// "linked_docs" array appended. Targets the server echoed as deleted
+// (and mid-chain 404 races) become {"deleted": true, ...} stubs so the
+// chain never breaks.
+func followDocLinks(ctx context.Context, client *api.Client, ws string, raw []byte) ([]byte, *api.Error) {
+	var env struct {
+		Doc map[string]any `json:"doc"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || env.Doc == nil {
+		return raw, nil // not the shape we expect; emit the plain doc
+	}
+
+	blocks, _ := env.Doc["blocks"].([]any)
+	linked := []any{}
+
+	for _, b := range blocks {
+		bm, ok := b.(map[string]any)
+		if !ok || bm["type"] != "doc_link" {
+			continue
+		}
+
+		target, _ := bm["target"].(map[string]any)
+		stub := map[string]any{"deleted": true, "doc_id": bm["doc_id"]}
+		if target != nil {
+			stub["slug"] = target["slug"]
+			stub["title"] = target["title"]
+		}
+
+		if target == nil || target["deleted"] == true {
+			linked = append(linked, stub)
+			continue
+		}
+
+		slug, _ := target["slug"].(string)
+		childRaw, apiErr := client.Get(ctx,
+			fmt.Sprintf("/api/workspaces/%s/docs/%s", ws, slug), nil)
+		if apiErr != nil {
+			if apiErr.Code == "not_found" {
+				linked = append(linked, stub)
+				continue
+			}
+			return nil, apiErr
+		}
+
+		var childEnv struct {
+			Doc json.RawMessage `json:"doc"`
+		}
+		if err := json.Unmarshal(childRaw, &childEnv); err != nil {
+			continue
+		}
+		linked = append(linked, json.RawMessage(childEnv.Doc))
+	}
+
+	out, err := json.Marshal(map[string]any{
+		"ok":          true,
+		"doc":         env.Doc,
+		"linked_docs": linked,
+	})
+	if err != nil {
+		return nil, &api.Error{Code: "client_encode_error", Message: err.Error()}
+	}
+	return out, nil
 }
 
 func createDocCmd() *cobra.Command {
 	var (
 		title, slug, summary, intent, blocksPath, actor string
 		tags                                            []string
-		pinned                                          bool
 	)
 
 	c := &cobra.Command{
@@ -125,7 +252,6 @@ Returns a minimal pointer the agent can chain off of:
 				"title":  title,
 				"blocks": blocks,
 				"actor":  defaultStr(actor, "agent"),
-				"pinned": pinned,
 			}
 			if slug != "" {
 				body["slug"] = slug
@@ -151,7 +277,6 @@ Returns a minimal pointer the agent can chain off of:
 	c.Flags().StringVar(&slug, "slug", "", "URL slug (optional; derived from title if omitted).")
 	c.Flags().StringVar(&summary, "summary", "", "One-line summary.")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Tag (repeatable). Must exist in workspace.")
-	c.Flags().BoolVar(&pinned, "pin", false, "Pin to the top of the workspace.")
 	c.Flags().StringVar(&blocksPath, "blocks", "", "Path to JSON file of blocks, '-' for stdin, or the raw JSON itself.")
 	c.Flags().StringVar(&intent, "intent", "", "Why you're creating this doc (audit trail).")
 	c.Flags().StringVar(&actor, "actor", "agent", "Actor type: human | agent.")
@@ -164,9 +289,7 @@ func applyOpsCmd() *cobra.Command {
 	var (
 		slug, opsPath, intent, dispositionsPath, actor string
 		tags                                           []string
-		pinned                                         bool
 		title, summary                                 string
-		clearPin                                       bool
 	)
 
 	c := &cobra.Command{
@@ -223,11 +346,6 @@ Returns the new version pointer:
 			if len(tags) > 0 {
 				body["tags"] = tags
 			}
-			if cmd.Flags().Changed("pin") {
-				body["pinned"] = pinned
-			} else if clearPin {
-				body["pinned"] = false
-			}
 			if dispositionsPath != "" {
 				disp, err := readJSONInput(dispositionsPath)
 				if err != nil {
@@ -250,11 +368,74 @@ Returns the new version pointer:
 	c.Flags().StringVar(&title, "title", "", "Update the title.")
 	c.Flags().StringVar(&summary, "summary", "", "Update the summary.")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Replace tag set (must all exist).")
-	c.Flags().BoolVar(&pinned, "pin", false, "Pin/unpin.")
-	c.Flags().BoolVar(&clearPin, "unpin", false, "Unpin (equivalent to --pin=false).")
 	c.Flags().StringVar(&actor, "actor", "agent", "Actor type: human | agent.")
 	_ = c.MarkFlagRequired("ops")
 	return c
+}
+
+func pinDocCmd() *cobra.Command {
+	var slot int
+
+	c := &cobra.Command{
+		Use:   "pin-doc <slug>",
+		Short: "Pin a doc to a home-page slot (1-6).",
+		Long: `Pin a doc to one of the workspace's 6 numbered home-page slots.
+Omit --slot to take the lowest free one. An occupied slot errors with
+pin_slot_taken (slots never displace silently); all slots taken errors
+with pin_limit_reached. The orientation doc has its own card and can't
+be slotted.`,
+		Example: `  aveline pin-doc oncall-runbook --slot 2
+  aveline pin-doc deploy-guide`,
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			body := map[string]any{}
+			if cmd.Flags().Changed("slot") {
+				body["slot"] = slot
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Post(ctx,
+				fmt.Sprintf("/api/workspaces/%s/docs/%s/pin", ws, args[0]), body)
+			return handle(raw, apiErr)
+		},
+	}
+
+	c.Flags().IntVar(&slot, "slot", 0, "Slot number 1-6 (omit for the lowest free slot).")
+	return c
+}
+
+func unpinDocCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "unpin-doc <slug>",
+		Short:        "Free a doc's home-page pin slot.",
+		Example:      `  aveline unpin-doc deploy-guide`,
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Delete(ctx,
+				fmt.Sprintf("/api/workspaces/%s/docs/%s/pin", ws, args[0]))
+			return handle(raw, apiErr)
+		},
+	}
 }
 
 func deleteDocCmd() *cobra.Command {
