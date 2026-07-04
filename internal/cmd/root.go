@@ -66,6 +66,7 @@ found, 1 = network / other).`,
 	// Docs
 	root.AddCommand(listDocsCmd())
 	root.AddCommand(getDocCmd())
+	root.AddCommand(getOrientationCmd())
 	root.AddCommand(createDocCmd())
 	root.AddCommand(applyOpsCmd())
 	root.AddCommand(deleteDocCmd())

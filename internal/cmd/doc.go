@@ -104,6 +104,47 @@ doc was deleted appears as {"deleted": true, ...} instead of a body.`,
 	return c
 }
 
+func getOrientationCmd() *cobra.Command {
+	var follow bool
+
+	c := &cobra.Command{
+		Use:   "get-orientation",
+		Short: "Show the workspace orientation doc — how this workspace uses Aveline.",
+		Long: `Show the workspace orientation doc: what lives in this workspace and
+how the team works. Every workspace has one (well-known slug, seeded at
+creation, undeletable).
+
+If you're an agent starting a session in an unfamiliar workspace, run
+this FIRST — with --follow to also pull the docs it links to, in order.`,
+		Example:      `  aveline get-orientation --follow`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Get(ctx,
+				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
+			if apiErr != nil || !follow {
+				return handle(raw, apiErr)
+			}
+			combined, apiErr := followDocLinks(ctx, client, ws, raw)
+			return handle(combined, apiErr)
+		},
+	}
+
+	c.Flags().BoolVar(&follow, "follow", false,
+		"Also fetch every doc_link target's full body, in order (one level deep).")
+	return c
+}
+
 // followDocLinks walks the doc's doc_link blocks in order and fetches
 // each target's full body, re-emitting the envelope with a
 // "linked_docs" array appended. Targets the server echoed as deleted
