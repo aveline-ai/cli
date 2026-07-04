@@ -67,9 +67,10 @@ func getDocCmd() *cobra.Command {
 		Short: "Show a doc with full block body.",
 		Long: `Show a doc with full block body.
 
-doc_link blocks carry a read-time "target" echo (slug, title, summary,
-deleted flag) — enough to decide which linked docs are worth a
-follow-up get-doc.`,
+doc_link blocks and inline span links (link: {doc_id} inside prose)
+carry a read-time "target" echo (slug, title, deleted flag) — enough
+to decide which linked docs are worth a follow-up get-doc. Write
+either form with link: {doc: <slug>}; the server resolves it.`,
 		Example:      `  aveline get-doc oncall-runbook`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
