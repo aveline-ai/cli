@@ -54,7 +54,7 @@ func getTagCmd() *cobra.Command {
 }
 
 func createTagCmd() *cobra.Command {
-	var name, description, color string
+	var name, description, color, sortKey string
 
 	c := &cobra.Command{
 		Use:   "create-tag",
@@ -85,6 +85,9 @@ understand what the tag covers.`,
 			if color != "" {
 				body["color"] = color
 			}
+			if sortKey != "" {
+				body["sort_key"] = sortKey
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Post(ctx,
@@ -97,12 +100,13 @@ understand what the tag covers.`,
 	c.Flags().StringVar(&description, "description", "", "Human description (required, 6–280 chars).")
 	_ = c.MarkFlagRequired("name")
 	c.Flags().StringVar(&color, "color", "", `Optional hex color like "#22c55e".`)
+	c.Flags().StringVar(&sortKey, "sort-key", "", `Optional sort override; tags order by sort key, falling back to the slug (e.g. "status:1").`)
 	_ = c.MarkFlagRequired("description")
 	return c
 }
 
 func editTagCmd() *cobra.Command {
-	var newName, description, color string
+	var newName, description, color, sortKey string
 
 	c := &cobra.Command{
 		Use:   "edit-tag <tag-slug>",
@@ -110,13 +114,14 @@ func editTagCmd() *cobra.Command {
 		Long: `Every edit creates a NEW VERSION of the tag (same base, version+1).
 Pass --name to rename (all attached docs migrate server-side),
 --description to overwrite the description, --color to set a hex color
-like "#22c55e" (pass "" to clear back to the default). At least one
-must be provided.`,
+like "#22c55e", --sort-key to reorder (tags sort by key, falling back
+to the slug; pass "" to clear color or sort key). At least one must be
+provided.`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if newName == "" && !cmd.Flags().Changed("description") && !cmd.Flags().Changed("color") {
-				return fmt.Errorf("provide --name, --description, and/or --color")
+			if newName == "" && !cmd.Flags().Changed("description") && !cmd.Flags().Changed("color") && !cmd.Flags().Changed("sort-key") {
+				return fmt.Errorf("provide --name, --description, --color, and/or --sort-key")
 			}
 			client, err := resolveAPI(false)
 			if err != nil {
@@ -136,6 +141,9 @@ must be provided.`,
 			if cmd.Flags().Changed("color") {
 				body["color"] = color
 			}
+			if cmd.Flags().Changed("sort-key") {
+				body["sort_key"] = sortKey
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Patch(ctx,
@@ -147,6 +155,7 @@ must be provided.`,
 	c.Flags().StringVar(&newName, "name", "", "New tag slug.")
 	c.Flags().StringVar(&description, "description", "", "New description (pass empty string to clear).")
 	c.Flags().StringVar(&color, "color", "", `Hex color like "#22c55e" ("" clears to the default).`)
+	c.Flags().StringVar(&sortKey, "sort-key", "", `Sort override ("" clears back to alphabetical).`)
 	return c
 }
 
