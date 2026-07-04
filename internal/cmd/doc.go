@@ -14,12 +14,21 @@ import (
 )
 
 func listDocsCmd() *cobra.Command {
-	var tags []string
+	var (
+		tags []string
+		has  []string
+	)
 
 	c := &cobra.Command{
-		Use:          "list-docs",
-		Short:        "List docs in the current workspace.",
-		Example:      `  aveline list-docs --tag runbook`,
+		Use:   "list-docs",
+		Short: "List docs in the current workspace.",
+		Long: `List docs in the current workspace.
+
+--has filters by structural kind: "links" (doc contains doc_link
+blocks — a trail) or "board" (doc contains a board block — a kanban).
+Repeatable; multiple values AND together.`,
+		Example: `  aveline list-docs --tag runbook
+  aveline list-docs --has board`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
@@ -39,6 +48,9 @@ func listDocsCmd() *cobra.Command {
 			if len(tags) > 0 {
 				q.Set("tag", strings.Join(tags, ","))
 			}
+			if len(has) > 0 {
+				q.Set("has", strings.Join(has, ","))
+			}
 
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -48,6 +60,7 @@ func listDocsCmd() *cobra.Command {
 	}
 
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
+	c.Flags().StringSliceVar(&has, "has", nil, "Filter by kind: links | board (repeatable).")
 	return c
 }
 
