@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aveline-ai/cli/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -64,19 +62,15 @@ block, i.e. renders a kanban).`,
 }
 
 func getDocCmd() *cobra.Command {
-	var follow bool
-
-	c := &cobra.Command{
+	return &cobra.Command{
 		Use:   "get-doc <slug>",
 		Short: "Show a doc with full block body.",
 		Long: `Show a doc with full block body.
 
---follow expands doc_link blocks: every linked doc's full body is
-fetched, in chain order, and returned under "linked_docs". One level
-deep only — links inside linked docs are not expanded. A stop whose
-doc was deleted appears as {"deleted": true, ...} instead of a body.`,
-		Example: `  aveline get-doc oncall-runbook
-  aveline get-doc onboarding-story --follow`,
+doc_link blocks carry a read-time "target" echo (slug, title, summary,
+deleted flag) — enough to decide which linked docs are worth a
+follow-up get-doc.`,
+		Example:      `  aveline get-doc oncall-runbook`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -92,32 +86,22 @@ doc was deleted appears as {"deleted": true, ...} instead of a body.`,
 			defer cancel()
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/docs/%s", ws, args[0]), nil)
-			if apiErr != nil || !follow {
-				return handle(raw, apiErr)
-			}
-			combined, apiErr := followDocLinks(ctx, client, ws, raw)
-			return handle(combined, apiErr)
+			return handle(raw, apiErr)
 		},
 	}
-
-	c.Flags().BoolVar(&follow, "follow", false,
-		"Also fetch every doc_link target's full body, in order (one level deep).")
-	return c
 }
 
 func getOrientationCmd() *cobra.Command {
-	var follow bool
-
-	c := &cobra.Command{
+	return &cobra.Command{
 		Use:   "get-orientation",
 		Short: "Show the workspace orientation doc — how this workspace uses Aveline.",
 		Long: `Show the workspace orientation doc: what lives in this workspace and
-how the team works. Every workspace has one (well-known slug, seeded at
-creation, undeletable).
+how the team works. Every workspace has one (seeded at creation,
+undeletable).
 
 If you're an agent starting a session in an unfamiliar workspace, run
-this FIRST — with --follow to also pull the docs it links to, in order.`,
-		Example:      `  aveline get-orientation --follow`,
+this FIRST, then get-doc anything it links to that looks relevant.`,
+		Example:      `  aveline get-orientation`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -133,82 +117,9 @@ this FIRST — with --follow to also pull the docs it links to, in order.`,
 			defer cancel()
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
-			if apiErr != nil || !follow {
-				return handle(raw, apiErr)
-			}
-			combined, apiErr := followDocLinks(ctx, client, ws, raw)
-			return handle(combined, apiErr)
+			return handle(raw, apiErr)
 		},
 	}
-
-	c.Flags().BoolVar(&follow, "follow", false,
-		"Also fetch every doc_link target's full body, in order (one level deep).")
-	return c
-}
-
-// followDocLinks walks the doc's doc_link blocks in order and fetches
-// each target's full body, re-emitting the envelope with a
-// "linked_docs" array appended. Targets the server echoed as deleted
-// (and mid-chain 404 races) become {"deleted": true, ...} stubs so the
-// chain never breaks.
-func followDocLinks(ctx context.Context, client *api.Client, ws string, raw []byte) ([]byte, *api.Error) {
-	var env struct {
-		Doc map[string]any `json:"doc"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil || env.Doc == nil {
-		return raw, nil // not the shape we expect; emit the plain doc
-	}
-
-	blocks, _ := env.Doc["blocks"].([]any)
-	linked := []any{}
-
-	for _, b := range blocks {
-		bm, ok := b.(map[string]any)
-		if !ok || bm["type"] != "doc_link" {
-			continue
-		}
-
-		target, _ := bm["target"].(map[string]any)
-		stub := map[string]any{"deleted": true, "doc_id": bm["doc_id"]}
-		if target != nil {
-			stub["slug"] = target["slug"]
-			stub["title"] = target["title"]
-		}
-
-		if target == nil || target["deleted"] == true {
-			linked = append(linked, stub)
-			continue
-		}
-
-		slug, _ := target["slug"].(string)
-		childRaw, apiErr := client.Get(ctx,
-			fmt.Sprintf("/api/workspaces/%s/docs/%s", ws, slug), nil)
-		if apiErr != nil {
-			if apiErr.Code == "not_found" {
-				linked = append(linked, stub)
-				continue
-			}
-			return nil, apiErr
-		}
-
-		var childEnv struct {
-			Doc json.RawMessage `json:"doc"`
-		}
-		if err := json.Unmarshal(childRaw, &childEnv); err != nil {
-			continue
-		}
-		linked = append(linked, json.RawMessage(childEnv.Doc))
-	}
-
-	out, err := json.Marshal(map[string]any{
-		"ok":          true,
-		"doc":         env.Doc,
-		"linked_docs": linked,
-	})
-	if err != nil {
-		return nil, &api.Error{Code: "client_encode_error", Message: err.Error()}
-	}
-	return out, nil
 }
 
 func createDocCmd() *cobra.Command {
