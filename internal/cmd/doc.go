@@ -24,9 +24,8 @@ func listDocsCmd() *cobra.Command {
 		Short: "List docs in the current workspace.",
 		Long: `List docs in the current workspace.
 
---has filters by structural kind: "links" (doc contains doc_link
-blocks — a trail) or "board" (doc contains a board block — a kanban).
-Repeatable; multiple values AND together.`,
+--has filters by structural kind: "board" (the doc contains a board
+block, i.e. renders a kanban).`,
 		Example: `  aveline list-docs --tag runbook
   aveline list-docs --has board`,
 		SilenceUsage: true,
@@ -60,7 +59,7 @@ Repeatable; multiple values AND together.`,
 	}
 
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
-	c.Flags().StringSliceVar(&has, "has", nil, "Filter by kind: links | board (repeatable).")
+	c.Flags().StringSliceVar(&has, "has", nil, `Filter by kind: "board".`)
 	return c
 }
 
