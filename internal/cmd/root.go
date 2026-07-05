@@ -99,6 +99,7 @@ found, 1 = network / other).`,
 
 	// Data sources
 	root.AddCommand(createDataSourceCmd())
+	root.AddCommand(editDataSourceCmd())
 	root.AddCommand(listDataSourcesCmd())
 	root.AddCommand(deleteDataSourceCmd())
 
