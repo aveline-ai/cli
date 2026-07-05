@@ -116,6 +116,54 @@ Rules:
 	return c
 }
 
+func queryDataSourceCmd() *cobra.Command {
+	var query string
+
+	c := &cobra.Command{
+		Use:   "query-data-source <name>",
+		Short: "Run a read-only SQL query against a data source (results not stored).",
+		Long: `Run one read-only SQL statement against a workspace data source and
+get {columns, rows} back. The chart-authoring REPL: explore the schema
+(information_schema), test a query, check the result shape — then embed
+the SQL in a chart block once it's right.
+
+Same guardrails as chart queries: read-only session, single statement,
+5 second timeout, 1000-row cap. Results are returned to you and stored
+nowhere.
+
+--query accepts text directly, '-' for stdin, or @PATH for a file.`,
+		Example: `  aveline query-data-source prod --query "select count(*) from users"
+  aveline query-data-source prod \
+    --query "select table_name from information_schema.tables where table_schema = 'public'"`,
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			text, err := readTextInput(query)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Post(ctx,
+				fmt.Sprintf("/api/workspaces/%s/data-sources/%s/query", ws, args[0]),
+				map[string]any{"query": text})
+			return handle(raw, apiErr)
+		},
+	}
+
+	c.Flags().StringVar(&query, "query", "", "The query. Text, '-' for stdin, or @PATH.")
+	_ = c.MarkFlagRequired("query")
+	return c
+}
+
 func listDataSourcesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "list-data-sources",
