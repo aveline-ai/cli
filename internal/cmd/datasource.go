@@ -78,8 +78,12 @@ func listDataSourcesCmd() *cobra.Command {
 
 func deleteDataSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:          "delete-data-source <name>",
-		Short:        "Soft-delete a data source (its charts show an error state until restore).",
+		Use:   "delete-data-source <name>",
+		Short: "Delete a data source; its credential is destroyed immediately.",
+		Long: `Delete a data source. The row survives for audit (name, adapter,
+who connected it, when) but the encrypted credential is hard-deleted
+in the same operation and cannot be recovered. Charts referencing it
+show an error state. There is no restore: connect a new source.`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,30 +99,6 @@ func deleteDataSourceCmd() *cobra.Command {
 			defer cancel()
 			raw, apiErr := client.Delete(ctx,
 				fmt.Sprintf("/api/workspaces/%s/data-sources/%s", ws, args[0]))
-			return handle(raw, apiErr)
-		},
-	}
-}
-
-func restoreDataSourceCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:          "restore-data-source <name>",
-		Short:        "Restore a soft-deleted data source; its charts come back.",
-		Args:         cobra.ExactArgs(1),
-		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := resolveAPI(false)
-			if err != nil {
-				return err
-			}
-			ws, err := resolveWorkspaceSlug()
-			if err != nil {
-				return err
-			}
-			ctx, cancel := withTimeout()
-			defer cancel()
-			raw, apiErr := client.Post(ctx,
-				fmt.Sprintf("/api/workspaces/%s/data-sources/%s/restore", ws, args[0]), nil)
 			return handle(raw, apiErr)
 		},
 	}

@@ -101,7 +101,6 @@ found, 1 = network / other).`,
 	root.AddCommand(createDataSourceCmd())
 	root.AddCommand(listDataSourcesCmd())
 	root.AddCommand(deleteDataSourceCmd())
-	root.AddCommand(restoreDataSourceCmd())
 
 	// Team
 	root.AddCommand(listMembersCmd())
