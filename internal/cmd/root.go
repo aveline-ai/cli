@@ -97,6 +97,12 @@ found, 1 = network / other).`,
 	root.AddCommand(deleteTagCmd())
 	root.AddCommand(restoreTagCmd())
 
+	// Data sources
+	root.AddCommand(createDataSourceCmd())
+	root.AddCommand(listDataSourcesCmd())
+	root.AddCommand(deleteDataSourceCmd())
+	root.AddCommand(restoreDataSourceCmd())
+
 	// Team
 	root.AddCommand(listMembersCmd())
 	root.AddCommand(addMemberCmd())
