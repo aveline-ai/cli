@@ -12,20 +12,12 @@ import (
 )
 
 func listDocsCmd() *cobra.Command {
-	var (
-		tags []string
-		has  []string
-	)
+	var tags []string
 
 	c := &cobra.Command{
 		Use:   "list-docs",
 		Short: "List docs in the current workspace.",
-		Long: `List docs in the current workspace.
-
---has filters by structural kind: "board" (the doc contains a board
-block, i.e. renders a kanban).`,
-		Example: `  aveline list-docs --tag runbook
-  aveline list-docs --has board`,
+		Example: `  aveline list-docs --tag runbook`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
@@ -45,9 +37,6 @@ block, i.e. renders a kanban).`,
 			if len(tags) > 0 {
 				q.Set("tag", strings.Join(tags, ","))
 			}
-			if len(has) > 0 {
-				q.Set("has", strings.Join(has, ","))
-			}
 
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -57,7 +46,6 @@ block, i.e. renders a kanban).`,
 	}
 
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
-	c.Flags().StringSliceVar(&has, "has", nil, `Filter by kind: "board".`)
 	return c
 }
 
