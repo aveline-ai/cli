@@ -97,6 +97,15 @@ found, 1 = network / other).`,
 	root.AddCommand(deleteTagCmd())
 	root.AddCommand(restoreTagCmd())
 
+	// Views
+	root.AddCommand(createViewCmd())
+	root.AddCommand(editViewCmd())
+	root.AddCommand(listViewsCmd())
+	root.AddCommand(deleteViewCmd())
+	root.AddCommand(restoreViewCmd())
+	root.AddCommand(pinViewCmd())
+	root.AddCommand(unpinViewCmd())
+
 	// Data sources
 	root.AddCommand(createDataSourceCmd())
 	root.AddCommand(editDataSourceCmd())
