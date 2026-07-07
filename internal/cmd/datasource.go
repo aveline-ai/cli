@@ -14,20 +14,25 @@ func createDataSourceCmd() *cobra.Command {
 		Short: "Connect an external database for chart blocks.",
 		Long: `Connect an external database this workspace can chart from.
 
---url is a connection-string TEMPLATE: your normal postgres:// or
-mysql:// URL with the literal placeholder <password> where the
-password goes. The template contains no secret, so every read surface
-shows it verbatim — you can always see exactly where a source points.
+--url is a connection-string TEMPLATE: your normal postgres://,
+mysql://, or redshift:// URL with the literal placeholder <password>
+where the password goes. The template contains no secret, so every
+read surface shows it verbatim — you can always see exactly where a
+source points.
 
 --password is the secret. It is encrypted at rest, has no read path
 (not even for you — lose it and you rotate), and is substituted into
-the template only at query time. Use a READ-ONLY database user:
-queries are forced read-only server-side, but least privilege is
-yours to grant.
+the template only at query time.
 
-Managed databases (RDS, Neon, PlanetScale, ...) usually require TLS:
-put ?sslmode=require in the template (?sslmode=verify-full to also
-validate the server certificate; mysql accepts ?ssl-mode=REQUIRED).
+USE A READ-ONLY DATABASE USER. The connection user's grants are the
+write-protection — Aveline does not (and cannot, for every engine)
+enforce read-only on your behalf. A write-capable credential means
+chart queries can write.
+
+Managed databases (RDS, Redshift, Neon, PlanetScale, ...) usually
+require TLS: put ?sslmode=require in the template (?sslmode=verify-full
+to also validate the server certificate; mysql accepts
+?ssl-mode=REQUIRED).
 
 Chart blocks reference the source by name:
     {"type": "chart", "source": "<name>", "query": "select ...",
@@ -131,9 +136,10 @@ get {columns, rows} back. The chart-authoring REPL: explore the schema
 (information_schema), test a query, check the result shape — then embed
 the SQL in a chart block once it's right.
 
-Same guardrails as chart queries: read-only session, single statement,
-5 second timeout, 1000-row cap. Results are returned to you and stored
-nowhere.
+Same guardrails as chart queries: single statement, 5 second timeout,
+1000-row cap. Results are returned to you and stored nowhere.
+Write-protection is your connection user's grants — with a
+write-capable credential this WILL execute writes.
 
 --query accepts text directly, '-' for stdin, or @PATH for a file.`,
 		Example: `  aveline query-data-source prod --query "select count(*) from users"
