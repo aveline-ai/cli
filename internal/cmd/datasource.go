@@ -25,6 +25,10 @@ the template only at query time. Use a READ-ONLY database user:
 queries are forced read-only server-side, but least privilege is
 yours to grant.
 
+Managed databases (RDS, Neon, PlanetScale, ...) usually require TLS:
+put ?sslmode=require in the template (?sslmode=verify-full to also
+validate the server certificate; mysql accepts ?ssl-mode=REQUIRED).
+
 Chart blocks reference the source by name:
     {"type": "chart", "source": "<name>", "query": "select ...",
      "viz": {"type": "line", "x": "day", "y": "signups"}}`,
