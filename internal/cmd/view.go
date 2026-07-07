@@ -14,17 +14,23 @@ func windowValue(v string) any {
 	return v
 }
 
-func viewConfig(tags []string, groupBy string, changedGroup bool, edited string, changedEdited bool) map[string]any {
+func scopeValue(v string) any {
+	if v == "" || v == "none" {
+		return nil
+	}
+	return v
+}
+
+func viewConfig(tags []string, groupBy string, changedGroup bool, subGroupBy string, changedSub bool, edited string, changedEdited bool) map[string]any {
 	config := map[string]any{}
 	if tags != nil {
 		config["tags"] = tags
 	}
 	if changedGroup {
-		if groupBy == "" || groupBy == "none" {
-			config["group_by"] = nil
-		} else {
-			config["group_by"] = groupBy
-		}
+		config["group_by"] = scopeValue(groupBy)
+	}
+	if changedSub {
+		config["sub_group_by"] = scopeValue(subGroupBy)
 	}
 	if changedEdited {
 		config["edited"] = windowValue(edited)
@@ -34,8 +40,8 @@ func viewConfig(tags []string, groupBy string, changedGroup bool, edited string,
 
 func createViewCmd() *cobra.Command {
 	var (
-		name, description, groupBy, edited string
-		tags                               []string
+		name, description, groupBy, subGroupBy, edited string
+		tags                                           []string
 	)
 
 	c := &cobra.Command{
@@ -64,7 +70,7 @@ you write tag descriptions.`,
 			body := map[string]any{
 				"name":        name,
 				"description": description,
-				"config":      viewConfig(tags, groupBy, cmd.Flags().Changed("group-by"), edited, cmd.Flags().Changed("edited")),
+				"config":      viewConfig(tags, groupBy, cmd.Flags().Changed("group-by"), subGroupBy, cmd.Flags().Changed("sub-group-by"), edited, cmd.Flags().Changed("edited")),
 			}
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -77,6 +83,7 @@ you write tag descriptions.`,
 	c.Flags().StringVar(&description, "description", "", "What this view is for (agents read this).")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter tag (repeatable; empty = all docs).")
 	c.Flags().StringVar(&groupBy, "group-by", "", `Tag scope to group by ("status"); omit for a list.`)
+	c.Flags().StringVar(&subGroupBy, "sub-group-by", "", `Second scope for subsections (needs --group-by).`)
 	c.Flags().StringVar(&edited, "edited", "", `Only docs last edited within a window ("7d", "24h").`)
 	_ = c.MarkFlagRequired("name")
 	_ = c.MarkFlagRequired("description")
@@ -85,8 +92,8 @@ you write tag descriptions.`,
 
 func editViewCmd() *cobra.Command {
 	var (
-		newName, description, groupBy, edited string
-		tags                                  []string
+		newName, description, groupBy, subGroupBy, edited string
+		tags                                              []string
 	)
 
 	c := &cobra.Command{
@@ -114,8 +121,8 @@ func editViewCmd() *cobra.Command {
 			if description != "" {
 				body["description"] = description
 			}
-			if cmd.Flags().Changed("tag") || cmd.Flags().Changed("group-by") || cmd.Flags().Changed("edited") {
-				body["config"] = viewConfig(tags, groupBy, cmd.Flags().Changed("group-by"), edited, cmd.Flags().Changed("edited"))
+			if cmd.Flags().Changed("tag") || cmd.Flags().Changed("group-by") || cmd.Flags().Changed("sub-group-by") || cmd.Flags().Changed("edited") {
+				body["config"] = viewConfig(tags, groupBy, cmd.Flags().Changed("group-by"), subGroupBy, cmd.Flags().Changed("sub-group-by"), edited, cmd.Flags().Changed("edited"))
 			}
 
 			ctx, cancel := withTimeout()
@@ -130,6 +137,7 @@ func editViewCmd() *cobra.Command {
 	c.Flags().StringVar(&description, "description", "", "New description.")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Replace the filter tag set (repeatable).")
 	c.Flags().StringVar(&groupBy, "group-by", "", `New group-by scope; "none" clears it.`)
+	c.Flags().StringVar(&subGroupBy, "sub-group-by", "", `Sub-group scope; "none" clears it.`)
 	c.Flags().StringVar(&edited, "edited", "", `Last-edited window ("7d"); "any" clears it.`)
 	return c
 }
