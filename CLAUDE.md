@@ -21,7 +21,8 @@ aveline list-comments <slug>
 
 # Write
 aveline create-doc --title "..." --blocks blocks.json --tag <tag>
-aveline apply-ops <slug> --ops ops.json --intent "why"
+aveline edit-doc <slug> --blocks blocks.json --intent "why"   # full replace
+aveline edit-doc <slug> --ops ops.json --intent "why"         # or surgical ops
 aveline create-comment <slug> --body "..."
 aveline reply-comment <slug> <parent-id> --body "..."
 

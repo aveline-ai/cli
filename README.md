@@ -44,8 +44,8 @@ aveline list-docs --pinned --tag runbook
 aveline get-doc deploy-guide
 aveline create-doc --title "Deploy guide" \
   --tag runbook --blocks blocks.json
-aveline apply-ops deploy-guide \
-  --ops ops.json \
+aveline edit-doc deploy-guide \
+  --blocks blocks.json \
   --intent "Add rollback section"
 ```
 
@@ -110,7 +110,7 @@ Categorized for readability; on the CLI they're all flat.
 `list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`
 
 ### Docs
-`list-docs`, `get-doc`, `create-doc`, `apply-ops`, `delete-doc`,
+`list-docs`, `get-doc`, `create-doc`, `edit-doc`, `delete-doc`,
 `restore-doc`, `kudos-doc`
 
 ### Versions

@@ -184,36 +184,57 @@ Returns a minimal pointer the agent can chain off of:
 	return c
 }
 
-func applyOpsCmd() *cobra.Command {
+func editDocCmd() *cobra.Command {
 	var (
-		slug, opsPath, intent, dispositionsPath, actor string
-		tags                                           []string
-		title, summary                                 string
+		slug, blocksPath, opsPath, intent, dispositionsPath, actor string
+		tags                                                       []string
+		title, summary                                            string
 	)
 
 	c := &cobra.Command{
-		Use:   "apply-ops <slug>",
-		Short: "Ship a new doc version by applying an ops array.",
-		Long: `Apply a list of block operations to an existing doc, producing a
-new version. Operations modify the block tree in order; supported ops:
-append_block, insert_block, modify_block, delete_block, move_block.
+		Use:     "edit-doc <slug>",
+		Aliases: []string{"apply-ops"},
+		Short:   "Ship a new version of a doc — full block array or surgical ops.",
+		Long: `Ship a new version of an existing doc. Two ways to say what changed
+(pass one, not both) — the same split as Write vs Edit:
 
---ops accepts either a JSON array on the command line, a path to a
-file, or '-' for stdin.
+  --blocks   The whole doc as it should end up. get-doc it, change what
+             you want, send it all back. The server reconciles against
+             the current doc by stable block id (matching id = same
+             block with updated content; a block with no id or an unknown
+             id is new; a current block you omit is deleted) — not a text
+             diff, so it's deterministic. Keep the "id" on blocks you're
+             keeping. Same block shapes as create-doc.
 
---dispositions is required when ops touch a block carrying an open
-comment. It accepts the same input forms as --ops. See
-` + "`aveline list-comments`" + ` to inspect what's open.
+  --ops      A surgical ops array, for touching one block in a big doc
+             without resending it: append_block, insert_block,
+             modify_block ({id, patch}), delete_block, move_block.
+
+Both --blocks and --ops accept a JSON array on the command line, a path
+to a file, or '-' for stdin.
+
+--dispositions is required when your edit changes or deletes a block
+that carries an open comment (either mode). It accepts the same input
+forms. Run ` + "`aveline list-comments <slug>`" + ` to see what's open.
 
 Returns the new version pointer:
     {"ok": true, "slug": "...", "doc_id": "...",
      "version_id": "...", "version_number": N}`,
-		Example: `  aveline apply-ops deploy-guide --ops ops.json \
-    --intent "Add escalation section" \
-    --dispositions disp.json`,
+		Example: `  # Full replace (fix a typo): fetch, edit, resend the blocks
+  aveline get-doc deploy-guide | jq .doc.blocks > blocks.json
+  # ...edit blocks.json...
+  aveline edit-doc deploy-guide --blocks blocks.json --intent "fix typo"
+
+  # Surgical: append one section to a large doc
+  aveline edit-doc deploy-guide --ops ops.json \
+    --intent "Add escalation section" --dispositions disp.json`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if (blocksPath == "") == (opsPath == "") {
+				return fmt.Errorf("pass exactly one of --blocks (full replace) or --ops (surgical)")
+			}
+
 			client, err := resolveAPI(false)
 			if err != nil {
 				return err
@@ -224,14 +245,21 @@ Returns the new version pointer:
 			}
 			slug = args[0]
 
-			ops, err := readJSONInput(opsPath)
-			if err != nil {
-				return fmt.Errorf("reading --ops: %w", err)
-			}
-
 			body := map[string]any{
-				"operations": ops,
-				"actor":      defaultStr(actor, "agent"),
+				"actor": defaultStr(actor, "agent"),
+			}
+			if blocksPath != "" {
+				blocks, err := readBlocks(blocksPath)
+				if err != nil {
+					return fmt.Errorf("reading --blocks: %w", err)
+				}
+				body["blocks"] = blocks
+			} else {
+				ops, err := readJSONInput(opsPath)
+				if err != nil {
+					return fmt.Errorf("reading --ops: %w", err)
+				}
+				body["operations"] = ops
 			}
 			if intent != "" {
 				body["intent"] = intent
@@ -261,14 +289,14 @@ Returns the new version pointer:
 		},
 	}
 
-	c.Flags().StringVar(&opsPath, "ops", "", "Ops array — path to JSON, '-' for stdin, or raw JSON.")
-	c.Flags().StringVar(&dispositionsPath, "dispositions", "", "comment_dispositions array — same input forms as --ops.")
+	c.Flags().StringVar(&blocksPath, "blocks", "", "Full block array (the doc as it should end up) — path to JSON, '-' for stdin, or raw JSON.")
+	c.Flags().StringVar(&opsPath, "ops", "", "Surgical ops array — same input forms as --blocks.")
+	c.Flags().StringVar(&dispositionsPath, "dispositions", "", "comment_dispositions array — same input forms as --blocks.")
 	c.Flags().StringVar(&intent, "intent", "", "Why this version was shipped (audit trail).")
 	c.Flags().StringVar(&title, "title", "", "Update the title.")
 	c.Flags().StringVar(&summary, "summary", "", "Update the summary.")
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Replace tag set (must all exist).")
 	c.Flags().StringVar(&actor, "actor", "agent", "Actor type: human | agent.")
-	_ = c.MarkFlagRequired("ops")
 	return c
 }
 

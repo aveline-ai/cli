@@ -221,7 +221,7 @@ func resolveCommentCmd() *cobra.Command {
 		Short: "Mark a comment thread resolved.",
 		Long: `Mark resolved. For agent-driven resolution that ships ALONG WITH
 a doc-version change, prefer the disposition flow in
-` + "`aveline apply-ops`" + ` — that posts a reply comment in the same
+` + "`aveline edit-doc`" + ` — that posts a reply comment in the same
 transaction and pins it to the new doc-version. This verb is the
 standalone "I addressed this offline" path.`,
 		Args:         cobra.ExactArgs(1),
