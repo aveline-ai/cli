@@ -111,6 +111,35 @@ this FIRST, then get-doc anything it links to that looks relevant.`,
 	}
 }
 
+func contractCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "contract",
+		Short: "Print the doc write contract — every block type and op, with a valid example.",
+		Long: `Print the authoritative write contract for docs: every block type
+(heading, paragraph, code, list, table, doc_link, chart) and every op
+(append_block, insert_block, modify_block, delete_block, move_block),
+each with a copy-and-adjust example, plus the inline-span shape, the two
+edit modes (--blocks vs --ops), and comment dispositions.
+
+Use this instead of guessing a block/op shape or reverse-engineering it
+from get-orientation output or a validation error. Workspace-independent
+(it describes the API, not any workspace's data), so no -w is needed.`,
+		Example:      `  aveline contract | jq .contract.block_types`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Get(ctx, "/api/contract", nil)
+			return handle(raw, apiErr)
+		},
+	}
+}
+
 func createDocCmd() *cobra.Command {
 	var (
 		title, slug, summary, intent, blocksPath, actor string
@@ -123,6 +152,9 @@ func createDocCmd() *cobra.Command {
 		Long: `Create a new doc. --blocks accepts either a JSON array on the
 command line or a path to a file containing the JSON. Pass --blocks=-
 to read from stdin.
+
+Run ` + "`aveline contract`" + ` for every block type's shape with a copy-and-
+adjust example (heading, paragraph, code, list, table, doc_link, chart).
 
 Returns a minimal pointer the agent can chain off of:
     {"ok": true, "slug": "...", "doc_id": "...",
@@ -204,7 +236,8 @@ func editDocCmd() *cobra.Command {
              block with updated content; a block with no id or an unknown
              id is new; a current block you omit is deleted) — not a text
              diff, so it's deterministic. Keep the "id" on blocks you're
-             keeping. Same block shapes as create-doc.
+             keeping. Same block shapes as create-doc (run
+             ` + "`aveline contract`" + ` for every shape with examples).
 
   --ops      A surgical ops array, for touching one block in a big doc
              without resending it: append_block, insert_block,

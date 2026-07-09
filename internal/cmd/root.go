@@ -67,6 +67,7 @@ found, 1 = network / other).`,
 	root.AddCommand(listDocsCmd())
 	root.AddCommand(getDocCmd())
 	root.AddCommand(getOrientationCmd())
+	root.AddCommand(contractCmd())
 	root.AddCommand(createDocCmd())
 	root.AddCommand(editDocCmd())
 	root.AddCommand(pinDocCmd())
