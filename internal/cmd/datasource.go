@@ -34,8 +34,10 @@ require TLS: put ?sslmode=require in the template (?sslmode=verify-full
 to also validate the server certificate; mysql accepts
 ?ssl-mode=REQUIRED).
 
-Chart blocks reference the source by name:
-    {"type": "chart", "source": "<name>", "query": "select ...",
+To chart a source, create a named query on it (create-query) and
+reference that query from a chart block by name:
+    aveline create-query --name signups --source <name> --sql "select ..."
+    {"type": "chart", "query_ref": "signups",
      "viz": {"type": "line", "x": "day", "y": "signups"}}`,
 		Example: `  aveline create-data-source --name prod \
     --url "postgres://metrics_ro:<password>@db.internal:5432/app" \
@@ -132,11 +134,15 @@ func queryDataSourceCmd() *cobra.Command {
 		Use:   "query-data-source <name>",
 		Short: "Run a read-only SQL query against a data source (results not stored).",
 		Long: `Run one read-only SQL statement against a workspace data source and
-get {columns, rows} back. The chart-authoring REPL: explore the schema
-(information_schema), test a query, check the result shape — then embed
-the SQL in a chart block once it's right.
+get {columns, rows} back. The query-authoring REPL: explore the schema
+(information_schema), test a query, check the result shape — then save
+it with create-query and chart it.
 
-Same guardrails as chart queries: single statement, 5 second timeout,
+Aim it at the built-in "derived" source to compose catalog queries in
+the analytics engine (DuckDB) — cross-source joins, regressions — with
+nothing saved.
+
+Same guardrails as saved queries: single statement, 5 second timeout,
 1000-row cap. Results are returned to you and stored nowhere.
 Write-protection is your connection user's grants — with a
 write-capable credential this WILL execute writes.

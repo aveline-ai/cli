@@ -114,6 +114,14 @@ found, 1 = network / other).`,
 	root.AddCommand(listDataSourcesCmd())
 	root.AddCommand(deleteDataSourceCmd())
 
+	// Query catalog
+	root.AddCommand(createQueryCmd())
+	root.AddCommand(editQueryCmd())
+	root.AddCommand(listQueriesCmd())
+	root.AddCommand(getQueryCmd())
+	root.AddCommand(deleteQueryCmd())
+	root.AddCommand(restoreQueryCmd())
+
 	// Team
 	root.AddCommand(listMembersCmd())
 	root.AddCommand(addMemberCmd())
