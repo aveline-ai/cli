@@ -40,7 +40,7 @@ aveline whoami
 aveline list-workspaces
 aveline use-workspace stable-pod               # save default in config
 
-aveline list-docs --pinned --tag runbook
+aveline list-docs --q "deploy rollback" --tag runbook
 aveline get-doc deploy-guide
 aveline create-doc --title "Deploy guide" \
   --tag runbook --blocks blocks.json
@@ -97,7 +97,8 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 `leave_on_deleted_block`, `reanchor_target_missing`,
 `invalid_disposition_action`, `comment_not_found`, `self_kudos`,
 `self_remove`, `already_member`, `not_member`, `not_user_deleted`,
-`would_orphan_docs`, `stale_version`, `internal_error`.
+`would_orphan_docs`, `stale_version`, `list_param_invalid`,
+`unknown_authors`, `internal_error`.
 
 ## Verbs
 

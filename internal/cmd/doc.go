@@ -12,12 +12,35 @@ import (
 )
 
 func listDocsCmd() *cobra.Command {
-	var tags []string
+	var (
+		tags    []string
+		authors []string
+		search  string
+		sort    string
+		edited  string
+		limit   int
+		offset  int
+	)
 
 	c := &cobra.Command{
 		Use:   "list-docs",
-		Short: "List docs in the current workspace.",
-		Example: `  aveline list-docs --tag runbook`,
+		Short: "List or search docs in the current workspace.",
+		Long: `List or search docs in the current workspace. One query surface:
+every flag composes with every other.
+
+--q is Postgres websearch grammar against title + summary + body text:
+  quoted "exact phrase", -word to exclude, OR for either.
+Search hits carry a "snippet" field ( **match** marked ) saying why the
+doc matched — often enough to triage without a get-doc.
+
+Ordering: relevance when --q is present, most recently edited
+otherwise; --sort recent|kudos|views|relevance overrides.
+
+Results cap at 25 unless --limit says otherwise (max 100); page with
+--offset.`,
+		Example: `  aveline list-docs --tag runbook
+  aveline list-docs --q "rollback -staging" --limit 5
+  aveline list-docs --q postgres --tag runbook --author arie --sort recent`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
@@ -37,6 +60,24 @@ func listDocsCmd() *cobra.Command {
 			if len(tags) > 0 {
 				q.Set("tag", strings.Join(tags, ","))
 			}
+			if len(authors) > 0 {
+				q.Set("author", strings.Join(authors, ","))
+			}
+			if search != "" {
+				q.Set("q", search)
+			}
+			if sort != "" {
+				q.Set("sort", sort)
+			}
+			if edited != "" {
+				q.Set("edited", edited)
+			}
+			if cmd.Flags().Changed("limit") {
+				q.Set("limit", fmt.Sprintf("%d", limit))
+			}
+			if offset > 0 {
+				q.Set("offset", fmt.Sprintf("%d", offset))
+			}
 
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -46,6 +87,12 @@ func listDocsCmd() *cobra.Command {
 	}
 
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
+	c.Flags().StringSliceVar(&authors, "author", nil, "Filter by owner username (repeatable).")
+	c.Flags().StringVar(&search, "q", "", "Full-text search (websearch grammar: \"phrase\", -word, OR).")
+	c.Flags().StringVar(&sort, "sort", "", "Order: recent | kudos | views | relevance (default: relevance with --q, recent without).")
+	c.Flags().StringVar(&edited, "edited", "", "Only docs edited within a window, e.g. 24h, 7d.")
+	c.Flags().IntVar(&limit, "limit", 25, "Max results (1-100).")
+	c.Flags().IntVar(&offset, "offset", 0, "Skip this many results (paging).")
 	return c
 }
 
