@@ -97,7 +97,8 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 `leave_on_deleted_block`, `reanchor_target_missing`,
 `invalid_disposition_action`, `comment_not_found`, `self_kudos`,
 `self_remove`, `already_member`, `not_member`, `not_user_deleted`,
-`would_orphan_docs`, `stale_version`, `query_not_found`, `list_param_invalid`,
+`would_orphan_docs`, `stale_version`, `query_not_found`, `last_key`,
+`list_param_invalid`,
 `unknown_authors`, `internal_error`.
 
 ## Verbs
@@ -105,7 +106,8 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 Categorized for readability; on the CLI they're all flat.
 
 ### Session
-`login`, `logout`, `whoami`, `heartbeat`
+`login`, `logout`, `whoami`, `heartbeat`, `list-keys`, `create-key`,
+`revoke-key`
 
 ### Workspaces
 `list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`

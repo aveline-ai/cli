@@ -56,6 +56,9 @@ found, 1 = network / other).`,
 	root.AddCommand(loginCmd())
 	root.AddCommand(logoutCmd())
 	root.AddCommand(whoamiCmd())
+	root.AddCommand(listKeysCmd())
+	root.AddCommand(createKeyCmd())
+	root.AddCommand(revokeKeyCmd())
 
 	// Workspaces
 	root.AddCommand(listWorkspacesCmd())
