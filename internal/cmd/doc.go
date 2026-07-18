@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func listDocsCmd() *cobra.Command {
@@ -32,6 +33,10 @@ every flag composes with every other.
   quoted "exact phrase", -word to exclude, OR for either.
 Search hits carry a "snippet" field ( **match** marked ) saying why the
 doc matched — often enough to triage without a get-doc.
+
+Matching is per-word with English stemming: "deploys" finds "deploy",
+but compound words don't split ("rollback" won't match "roll back") —
+try both forms when a first query comes up empty.
 
 Ordering: relevance when --q is present, most recently edited
 otherwise; --sort recent|kudos|views|relevance overrides.
@@ -89,6 +94,13 @@ Results cap at 25 unless --limit says otherwise (max 100); page with
 	c.Flags().StringSliceVar(&tags, "tag", nil, "Filter by tag (repeatable).")
 	c.Flags().StringSliceVar(&authors, "author", nil, "Filter by owner username (repeatable).")
 	c.Flags().StringVar(&search, "q", "", "Full-text search (websearch grammar: \"phrase\", -word, OR).")
+	// --query is an accepted spelling of --q.
+	c.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "query" {
+			name = "q"
+		}
+		return pflag.NormalizedName(name)
+	})
 	c.Flags().StringVar(&sort, "sort", "", "Order: recent | kudos | views | relevance (default: relevance with --q, recent without).")
 	c.Flags().StringVar(&edited, "edited", "", "Only docs edited within a window, e.g. 24h, 7d.")
 	c.Flags().IntVar(&limit, "limit", 25, "Max results (1-100).")
