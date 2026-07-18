@@ -75,6 +75,7 @@ found, 1 = network / other).`,
 	root.AddCommand(deleteDocCmd())
 	root.AddCommand(restoreDocCmd())
 	root.AddCommand(kudosDocCmd())
+	root.AddCommand(runBlockCmd())
 
 	// Versions
 	root.AddCommand(listVersionsCmd())

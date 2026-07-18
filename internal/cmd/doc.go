@@ -529,6 +529,37 @@ func kudosDocCmd() *cobra.Command {
 	}
 }
 
+func runBlockCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "run-block <doc-slug> <block-id>",
+		Short: "Run a chart block's query and return its rows.",
+		Long: `Run a chart block's query and return its rows.
+
+get-doc returns chart CONFIG only (a doc read never dials a customer
+database); this verb executes the block's catalog query on demand and
+returns {columns, rows}. Query failures come back as query_failed with
+the driver's message.`,
+		Example:      `  aveline run-block growth-dash b_AbC123`,
+		Args:         cobra.ExactArgs(2),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := resolveAPI(false)
+			if err != nil {
+				return err
+			}
+			ws, err := resolveWorkspaceSlug()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := withTimeout()
+			defer cancel()
+			raw, apiErr := client.Post(ctx,
+				fmt.Sprintf("/api/workspaces/%s/docs/%s/blocks/%s/run", ws, args[0], args[1]), nil)
+			return handle(raw, apiErr)
+		},
+	}
+}
+
 // ----- Shared helpers --------------------------------------------------
 
 // readBlocks reads a JSON-array argument that may be (a) the path to a

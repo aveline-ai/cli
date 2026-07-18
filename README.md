@@ -97,7 +97,7 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 `leave_on_deleted_block`, `reanchor_target_missing`,
 `invalid_disposition_action`, `comment_not_found`, `self_kudos`,
 `self_remove`, `already_member`, `not_member`, `not_user_deleted`,
-`would_orphan_docs`, `stale_version`, `list_param_invalid`,
+`would_orphan_docs`, `stale_version`, `query_not_found`, `list_param_invalid`,
 `unknown_authors`, `internal_error`.
 
 ## Verbs
@@ -112,7 +112,7 @@ Categorized for readability; on the CLI they're all flat.
 
 ### Docs
 `list-docs`, `get-doc`, `create-doc`, `edit-doc`, `delete-doc`,
-`restore-doc`, `kudos-doc`
+`restore-doc`, `kudos-doc`, `run-block`
 
 ### Versions
 `list-versions`, `get-version`
