@@ -123,6 +123,9 @@ Categorized for readability; on the CLI they're all flat.
 `list-comments`, `create-comment`, `reply-comment`, `edit-comment`,
 `delete-comment`, `undelete-comment`, `resolve-comment`, `unresolve-comment`
 
+### Milestones
+`create-milestone`, `list-milestones`, `delete-milestone`
+
 ### Tags
 `list-tags`, `get-tag`, `create-tag`, `edit-tag`, `delete-tag`
 

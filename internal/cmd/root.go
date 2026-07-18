@@ -118,6 +118,11 @@ found, 1 = network / other).`,
 	root.AddCommand(listDataSourcesCmd())
 	root.AddCommand(deleteDataSourceCmd())
 
+	// Timeline milestones
+	root.AddCommand(createMilestoneCmd())
+	root.AddCommand(listMilestonesCmd())
+	root.AddCommand(deleteMilestoneCmd())
+
 	// Query catalog
 	root.AddCommand(createQueryCmd())
 	root.AddCommand(editQueryCmd())

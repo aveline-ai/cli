@@ -8,7 +8,7 @@ import (
 )
 
 func createQueryCmd() *cobra.Command {
-	var name, source, sql string
+	var name, source, sql, description string
 
 	c := &cobra.Command{
 		Use:   "create-query",
@@ -56,6 +56,9 @@ Charts reference a query by name:
 			if source != "" {
 				body["source"] = source
 			}
+			if description != "" {
+				body["description"] = description
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Post(ctx,
@@ -67,13 +70,14 @@ Charts reference a query by name:
 	c.Flags().StringVar(&name, "name", "", "Query name (a table-safe identifier).")
 	c.Flags().StringVar(&source, "source", "", "Data source name for a RAW query; omit for DERIVED.")
 	c.Flags().StringVar(&sql, "sql", "", "The SQL. Text, '-' for stdin, or @PATH.")
+	c.Flags().StringVar(&description, "description", "", "One line on what this query answers. Shown wherever the query is listed; give every query one.")
 	_ = c.MarkFlagRequired("name")
 	_ = c.MarkFlagRequired("sql")
 	return c
 }
 
 func editQueryCmd() *cobra.Command {
-	var newName, sql string
+	var newName, sql, description string
 
 	c := &cobra.Command{
 		Use:   "edit-query <name>",
@@ -109,6 +113,9 @@ charts referencing it by name never notice.
 				}
 				body["sql"] = text
 			}
+			if cmd.Flags().Changed("description") {
+				body["description"] = description
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Patch(ctx,
@@ -119,6 +126,7 @@ charts referencing it by name never notice.
 
 	c.Flags().StringVar(&newName, "new-name", "", "New query name.")
 	c.Flags().StringVar(&sql, "sql", "", "New SQL. Text, '-' for stdin, or @PATH.")
+	c.Flags().StringVar(&description, "description", "", "New description; pass \"\" to clear.")
 	return c
 }
 
