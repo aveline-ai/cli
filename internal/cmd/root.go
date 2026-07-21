@@ -79,6 +79,10 @@ found, 1 = network / other).`,
 	root.AddCommand(restoreDocCmd())
 	root.AddCommand(kudosDocCmd())
 	root.AddCommand(runBlockCmd())
+	root.AddCommand(setDocVisibilityCmd())
+	root.AddCommand(shareDocCmd())
+	root.AddCommand(unshareDocCmd())
+	root.AddCommand(listSharesCmd())
 
 	// Versions
 	root.AddCommand(listVersionsCmd())

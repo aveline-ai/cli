@@ -201,8 +201,8 @@ from get-orientation output or a validation error. Workspace-independent
 
 func createDocCmd() *cobra.Command {
 	var (
-		title, slug, summary, intent, blocksPath, actor string
-		tags                                            []string
+		title, slug, summary, intent, blocksPath, actor, visibility string
+		tags                                                        []string
 	)
 
 	c := &cobra.Command{
@@ -255,6 +255,9 @@ Returns a minimal pointer the agent can chain off of:
 			if len(tags) > 0 {
 				body["tags"] = tags
 			}
+			if visibility != "" {
+				body["visibility"] = visibility
+			}
 
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -270,6 +273,7 @@ Returns a minimal pointer the agent can chain off of:
 	c.Flags().StringVar(&blocksPath, "blocks", "", "Path to JSON file of blocks, '-' for stdin, or the raw JSON itself.")
 	c.Flags().StringVar(&intent, "intent", "", "Why you're creating this doc (audit trail).")
 	c.Flags().StringVar(&actor, "actor", "agent", "Actor type: human | agent.")
+	c.Flags().StringVar(&visibility, "visibility", "", "private | workspace (default workspace). Private docs are yours until shared or published.")
 	_ = c.MarkFlagRequired("title")
 	_ = c.MarkFlagRequired("blocks")
 	return c
