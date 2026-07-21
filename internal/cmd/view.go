@@ -40,8 +40,8 @@ func viewConfig(tags []string, groupBy string, changedGroup bool, subGroupBy str
 
 func createViewCmd() *cobra.Command {
 	var (
-		name, description, groupBy, subGroupBy, edited string
-		tags                                           []string
+		name, description, groupBy, subGroupBy, edited, bucket string
+		tags                                                   []string
 	)
 
 	c := &cobra.Command{
@@ -72,6 +72,9 @@ you write tag descriptions.`,
 				"description": description,
 				"config":      viewConfig(tags, groupBy, cmd.Flags().Changed("group-by"), subGroupBy, cmd.Flags().Changed("sub-group-by"), edited, cmd.Flags().Changed("edited")),
 			}
+			if bucket != "" {
+				body["bucket"] = bucket
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Post(ctx, fmt.Sprintf("/api/workspaces/%s/views", ws), body)
@@ -85,6 +88,7 @@ you write tag descriptions.`,
 	c.Flags().StringVar(&groupBy, "group-by", "", `Tag scope to group by ("status"); omit for a list.`)
 	c.Flags().StringVar(&subGroupBy, "sub-group-by", "", `Second scope for subsections (needs --group-by).`)
 	c.Flags().StringVar(&edited, "edited", "", `Only docs last edited within a window ("7d", "24h").`)
+	c.Flags().StringVar(&bucket, "bucket", "", `Bucket to create the view in: "yours", a project bucket name, or omit for team.`)
 	_ = c.MarkFlagRequired("name")
 	_ = c.MarkFlagRequired("description")
 	return c
