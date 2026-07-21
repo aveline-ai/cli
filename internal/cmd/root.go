@@ -83,6 +83,10 @@ found, 1 = network / other).`,
 	root.AddCommand(shareDocCmd())
 	root.AddCommand(unshareDocCmd())
 	root.AddCommand(listSharesCmd())
+	root.AddCommand(setViewVisibilityCmd())
+	root.AddCommand(shareViewCmd())
+	root.AddCommand(unshareViewCmd())
+	root.AddCommand(listViewSharesCmd())
 
 	// Versions
 	root.AddCommand(listVersionsCmd())
