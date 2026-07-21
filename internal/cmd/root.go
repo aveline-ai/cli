@@ -119,6 +119,7 @@ found, 1 = network / other).`,
 	// View buckets
 	root.AddCommand(listBucketsCmd())
 	root.AddCommand(createBucketCmd())
+	root.AddCommand(setBucketVisibilityCmd())
 	root.AddCommand(deleteBucketCmd())
 	root.AddCommand(addBucketMemberCmd())
 	root.AddCommand(removeBucketMemberCmd())
