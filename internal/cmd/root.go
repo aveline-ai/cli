@@ -42,7 +42,16 @@ how an agent would call it.
 Output is JSON by default — pass --human for pretty-print. Errors are
 written to stderr as the API's machine-readable error envelope; the
 process exit code groups them (2 = validation, 3 = auth, 4 = not
-found, 1 = network / other).`,
+found, 1 = network / other).
+
+START HERE (agents): run these before anything else —
+  aveline get-orientation   how this workspace organizes its knowledge
+  aveline contract          every doc block type and edit op, with a
+                            valid example (required reading before your
+                            first create-doc or edit-doc)
+
+New docs are born PRIVATE and new views land in your personal bucket:
+publish deliberately with --visibility workspace / --bucket team.`,
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
