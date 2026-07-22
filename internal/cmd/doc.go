@@ -273,7 +273,7 @@ Returns a minimal pointer the agent can chain off of:
 	c.Flags().StringVar(&blocksPath, "blocks", "", "Path to JSON file of blocks, '-' for stdin, or the raw JSON itself.")
 	c.Flags().StringVar(&intent, "intent", "", "Why you're creating this doc (audit trail).")
 	c.Flags().StringVar(&actor, "actor", "agent", "Actor type: human | agent.")
-	c.Flags().StringVar(&visibility, "visibility", "", "private | workspace (default workspace). Private docs are yours until shared or published.")
+	c.Flags().StringVar(&visibility, "visibility", "", "private (default) | workspace. Docs are born private; pass workspace to publish to the team.")
 	_ = c.MarkFlagRequired("title")
 	_ = c.MarkFlagRequired("blocks")
 	return c

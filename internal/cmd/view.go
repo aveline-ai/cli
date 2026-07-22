@@ -88,7 +88,7 @@ you write tag descriptions.`,
 	c.Flags().StringVar(&groupBy, "group-by", "", `Tag scope to group by ("status"); omit for a list.`)
 	c.Flags().StringVar(&subGroupBy, "sub-group-by", "", `Second scope for subsections (needs --group-by).`)
 	c.Flags().StringVar(&edited, "edited", "", `Only docs last edited within a window ("7d", "24h").`)
-	c.Flags().StringVar(&bucket, "bucket", "", `Bucket to create the view in: "yours", a project bucket name, or omit for team.`)
+	c.Flags().StringVar(&bucket, "bucket", "", `Bucket to create the view in: "team", a project bucket name, or omit for yours (private by default).`)
 	_ = c.MarkFlagRequired("name")
 	_ = c.MarkFlagRequired("description")
 	return c
