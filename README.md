@@ -28,7 +28,7 @@ Grab the archive for your OS/arch from the
 [releases page](https://github.com/aveline-ai/cli/releases/latest):
 
 ```sh
-gh release download --repo aveline-ai/cli --pattern "*$(uname -s)_$(uname -m)*.tar.gz" -O - | tar xz
+gh release download --repo aveline-ai/cli --pattern "*$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m)*.tar.gz" -O - | tar xz
 sudo mv aveline /usr/local/bin/
 ```
 
