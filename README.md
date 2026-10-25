@@ -174,3 +174,7 @@ git push --tags
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Orientation
+
+`get-orientation` returns `primer` (Aveline's own base doc, with a version) ahead of `doc` (the workspace's orientation). The workspace doc wins where they disagree. When the primer's version changes between runs the CLI prints one line to stderr; stdout is always the JSON.
