@@ -29,7 +29,7 @@ func TestPathHomeFallback(t *testing.T) {
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod"}
+	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod", PrimerVersion: 4}
 	require.NoError(t, Save(in))
 
 	p, _ := Path()

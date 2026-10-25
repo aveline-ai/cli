@@ -28,6 +28,10 @@ type Config struct {
 	APIURL    string `toml:"api_url,omitempty"`
 	Token     string `toml:"token,omitempty"`
 	Workspace string `toml:"workspace,omitempty"`
+	// PrimerVersion is the version of Aveline's base doc (the "primer")
+	// last seen in a get-orientation response, so the CLI can say once
+	// when it changes. Zero means never seen.
+	PrimerVersion int `toml:"primer_version,omitempty"`
 }
 
 // Path returns the resolved absolute path to the config file. It does not

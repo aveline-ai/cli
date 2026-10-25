@@ -45,7 +45,10 @@ process exit code groups them (2 = validation, 3 = auth, 4 = not
 found, 1 = network / other).
 
 START HERE (agents): run these before anything else —
-  aveline get-orientation   how this workspace organizes its knowledge
+  aveline get-orientation   Aveline's base doc (the primer: how Aveline
+                            works, the words a person says to you, tags),
+                            then how this workspace organizes its
+                            knowledge; the workspace doc wins on conflict
   aveline contract          every doc block type and edit op, with a
                             valid example (required reading before your
                             first create-doc or edit-doc)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aveline-ai/cli/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -147,6 +148,12 @@ func getOrientationCmd() *cobra.Command {
 how the team works. Every workspace has one (seeded at creation,
 undeletable).
 
+The response carries two things, in reading order: "primer", Aveline's
+own base doc (how Aveline works, the words a person says to you, tags,
+with a version number), then "doc", the team's orientation. Where they
+disagree the team's doc wins. When the primer's version changes between
+runs the CLI says so once on stderr; stdout is always the JSON.
+
 If you're an agent starting a session in an unfamiliar workspace, run
 this FIRST, then get-doc anything it links to that looks relevant.`,
 		Example:      `  aveline get-orientation`,
@@ -165,8 +172,58 @@ this FIRST, then get-doc anything it links to that looks relevant.`,
 			defer cancel()
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
+			if apiErr == nil {
+				notePrimerVersion(raw)
+			}
 			return handle(raw, apiErr)
 		},
+	}
+}
+
+// primerVersionOf pulls primer.version out of a get-orientation response.
+// Zero when the server sent no primer (an older server) or the field is
+// not a positive integer.
+func primerVersionOf(raw []byte) int {
+	var env struct {
+		Primer struct {
+			Version int `json:"version"`
+		} `json:"primer"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || env.Primer.Version < 1 {
+		return 0
+	}
+	return env.Primer.Version
+}
+
+// primerNotice is the one line to print when the base doc's version moved
+// since the last run. Nothing to say on first sight (prev == 0), when the
+// server sent no primer (cur == 0), or when nothing changed.
+func primerNotice(prev, cur int) (string, bool) {
+	if prev == 0 || cur == 0 || prev == cur {
+		return "", false
+	}
+	return fmt.Sprintf("Aveline base doc updated: v%d -> v%d. Re-read the orientation before relying on what you remember.", prev, cur), true
+}
+
+// notePrimerVersion compares the response's primer version with the one
+// stored in the config, prints the notice to stderr if it moved, and
+// stores the new one. Best effort: a config that cannot be read or written
+// never fails the command, since stdout still has the orientation.
+func notePrimerVersion(raw []byte) {
+	cur := primerVersionOf(raw)
+	if cur == 0 {
+		return
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return
+	}
+	if msg, ok := primerNotice(cfg.PrimerVersion, cur); ok {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	if cfg.PrimerVersion != cur {
+		cfg.PrimerVersion = cur
+		_ = config.Save(cfg)
 	}
 }
 
@@ -283,7 +340,7 @@ func editDocCmd() *cobra.Command {
 	var (
 		slug, blocksPath, opsPath, intent, dispositionsPath, actor string
 		tags                                                       []string
-		title, summary                                            string
+		title, summary                                             string
 	)
 
 	c := &cobra.Command{
