@@ -86,40 +86,75 @@ func Load() (Config, error) {
 }
 
 // Save writes the config file with 0600 permissions, creating the parent
-// directory if necessary. The write is atomic (a temp file in the same
-// directory, then rename), so a concurrent Load never sees a truncated
-// file.
+// directory if necessary. It prefers an atomic write (a temp file in the
+// same directory, then rename, through any symlink) so a concurrent Load
+// never sees a truncated file; where the directory itself is not
+// writable but the file is, it falls back to writing in place.
 func Save(c Config) error {
 	p, err := Path()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil && !os.IsExist(err) && !os.IsPermission(err) {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
-	f, err := os.CreateTemp(filepath.Dir(p), ".config-*.toml")
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		p = real
+	}
+	sweepTemps(filepath.Dir(p))
+	if err := saveAtomic(p, c); err == nil {
+		return nil
+	}
+	return saveInPlace(p, c)
+}
+
+func saveAtomic(p string, c Config) error {
+	f, err := os.CreateTemp(filepath.Dir(p), tempPrefix+"*.toml")
 	if err != nil {
-		return fmt.Errorf("creating temp config: %w", err)
+		return err
 	}
 	tmp := f.Name()
-	cleanup := func() { f.Close(); os.Remove(tmp) }
 	if err := f.Chmod(0o600); err != nil {
-		cleanup()
-		return fmt.Errorf("setting config mode: %w", err)
+		f.Close()
+		os.Remove(tmp)
+		return err
 	}
 	if err := toml.NewEncoder(f).Encode(c); err != nil {
-		cleanup()
+		f.Close()
+		os.Remove(tmp)
 		return fmt.Errorf("encoding config: %w", err)
 	}
 	if err := f.Close(); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("writing %s: %w", p, err)
+		return err
 	}
 	if err := os.Rename(tmp, p); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("replacing %s: %w", p, err)
+		return err
 	}
 	return nil
+}
+
+func saveInPlace(p string, c Config) error {
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", p, err)
+	}
+	defer f.Close()
+	if err := toml.NewEncoder(f).Encode(c); err != nil {
+		return fmt.Errorf("encoding config: %w", err)
+	}
+	return nil
+}
+
+const tempPrefix = ".config-"
+
+// sweepTemps removes temp files a killed Save may have left behind.
+func sweepTemps(dir string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, tempPrefix+"*.toml"))
+	for _, m := range matches {
+		_ = os.Remove(m)
+	}
 }
 
 // Resolve produces the effective API URL given precedence:

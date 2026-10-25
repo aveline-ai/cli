@@ -176,7 +176,7 @@ this FIRST, then get-doc anything it links to that looks relevant.`,
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
 			if apiErr == nil {
-				notePrimerVersion(raw, loadCfg().Resolve(flagAPIURL))
+				notePrimerVersion(raw, strings.TrimRight(loadCfg().Resolve(flagAPIURL), "/"))
 			}
 			return handle(raw, apiErr)
 		},

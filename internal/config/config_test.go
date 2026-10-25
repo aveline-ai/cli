@@ -86,3 +86,39 @@ func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 1, "only config.toml should remain")
 }
+
+func TestSaveFallsBackWhenDirIsReadOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	require.NoError(t, Save(Config{Token: "one"}))
+	cfgDir := filepath.Join(dir, "aveline")
+	require.NoError(t, os.Chmod(cfgDir, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(cfgDir, 0o755) })
+	require.NoError(t, Save(Config{Token: "two"}), "writable file in a read-only dir must still save")
+	out, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "two", out.Token)
+}
+
+func TestSaveWritesThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	cfgDir := filepath.Join(dir, "aveline")
+	require.NoError(t, os.MkdirAll(cfgDir, 0o700))
+	real := filepath.Join(dir, "real.toml")
+	require.NoError(t, os.WriteFile(real, []byte(""), 0o600))
+	require.NoError(t, os.Symlink(real, filepath.Join(cfgDir, "config.toml")))
+	require.NoError(t, Save(Config{Token: "via-link"}))
+	info, err := os.Lstat(filepath.Join(cfgDir, "config.toml"))
+	require.NoError(t, err)
+	assert.True(t, info.Mode()&os.ModeSymlink != 0, "symlink must survive")
+	data, err := os.ReadFile(real)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "via-link")
+}
