@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,8 +207,11 @@ func primerNotice(prev, cur int) (string, bool) {
 		return "", false
 	}
 	msg := fmt.Sprintf("Aveline base doc updated: v%d -> v%d. Re-read the orientation before relying on what you remember.", prev, cur)
-	line, _ := json.Marshal(map[string]string{"notice": msg})
-	return string(line), true
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // keep "->" readable on a raw stderr
+	_ = enc.Encode(map[string]string{"notice": msg})
+	return strings.TrimRight(buf.String(), "\n"), true
 }
 
 // notePrimerVersion compares the response's primer version with the one
