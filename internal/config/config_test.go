@@ -29,7 +29,7 @@ func TestPathHomeFallback(t *testing.T) {
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod", PrimerVersion: 4}
+	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod", PrimerVersions: map[string]int{"http://localhost:4000": 4}}
 	require.NoError(t, Save(in))
 
 	p, _ := Path()
@@ -63,4 +63,26 @@ func TestResolvePrecedence(t *testing.T) {
 	t.Setenv("AVELINE_API_URL", "")
 	empty := Config{}
 	assert.Equal(t, DefaultAPIURL, empty.Resolve(""))
+}
+
+func TestPrimerVersionPerURL(t *testing.T) {
+	c := Config{}
+	assert.Equal(t, 0, c.PrimerVersion("https://a"))
+	c = c.WithPrimerVersion("https://a", 2).WithPrimerVersion("https://b", 5)
+	assert.Equal(t, 2, c.PrimerVersion("https://a"))
+	assert.Equal(t, 5, c.PrimerVersion("https://b"))
+	assert.Equal(t, 0, c.PrimerVersion("https://c"))
+}
+
+func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	require.NoError(t, Save(Config{Token: "one"}))
+	require.NoError(t, Save(Config{Token: "two"}))
+	out, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "two", out.Token)
+	entries, err := os.ReadDir(filepath.Join(dir, "aveline"))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "only config.toml should remain")
 }

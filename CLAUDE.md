@@ -15,7 +15,7 @@ Common chains:
 ```sh
 # Inspect
 aveline whoami
-aveline get-orientation      # Aveline's base doc (primer, versioned) then the workspace's; the workspace doc wins
+aveline get-orientation      # Aveline's base doc (primer, versioned; read first) and the workspace's; the workspace doc wins
 aveline list-docs --tag runbook --pinned
 aveline get-doc <slug>
 aveline list-comments <slug>

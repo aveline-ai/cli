@@ -28,10 +28,27 @@ type Config struct {
 	APIURL    string `toml:"api_url,omitempty"`
 	Token     string `toml:"token,omitempty"`
 	Workspace string `toml:"workspace,omitempty"`
-	// PrimerVersion is the version of Aveline's base doc (the "primer")
-	// last seen in a get-orientation response, so the CLI can say once
-	// when it changes. Zero means never seen.
-	PrimerVersion int `toml:"primer_version,omitempty"`
+	// PrimerVersions is, per API URL, the version of Aveline's base doc
+	// (the "primer") last seen in a get-orientation response, so the CLI
+	// can say once when it changes. Keyed by URL because a dev server and
+	// production can be at different versions. Absent means never seen.
+	PrimerVersions map[string]int `toml:"primer_versions,omitempty"`
+}
+
+// PrimerVersion is the primer version last seen from apiURL, or 0.
+func (c Config) PrimerVersion(apiURL string) int {
+	return c.PrimerVersions[apiURL]
+}
+
+// WithPrimerVersion returns a copy of c remembering v for apiURL.
+func (c Config) WithPrimerVersion(apiURL string, v int) Config {
+	m := make(map[string]int, len(c.PrimerVersions)+1)
+	for k, val := range c.PrimerVersions {
+		m[k] = val
+	}
+	m[apiURL] = v
+	c.PrimerVersions = m
+	return c
 }
 
 // Path returns the resolved absolute path to the config file. It does not
@@ -69,7 +86,9 @@ func Load() (Config, error) {
 }
 
 // Save writes the config file with 0600 permissions, creating the parent
-// directory if necessary.
+// directory if necessary. The write is atomic (a temp file in the same
+// directory, then rename), so a concurrent Load never sees a truncated
+// file.
 func Save(c Config) error {
 	p, err := Path()
 	if err != nil {
@@ -78,14 +97,27 @@ func Save(c Config) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
-	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.CreateTemp(filepath.Dir(p), ".config-*.toml")
 	if err != nil {
-		return fmt.Errorf("opening %s: %w", p, err)
+		return fmt.Errorf("creating temp config: %w", err)
 	}
-	defer f.Close()
-	enc := toml.NewEncoder(f)
-	if err := enc.Encode(c); err != nil {
+	tmp := f.Name()
+	cleanup := func() { f.Close(); os.Remove(tmp) }
+	if err := f.Chmod(0o600); err != nil {
+		cleanup()
+		return fmt.Errorf("setting config mode: %w", err)
+	}
+	if err := toml.NewEncoder(f).Encode(c); err != nil {
+		cleanup()
 		return fmt.Errorf("encoding config: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("writing %s: %w", p, err)
+	}
+	if err := os.Rename(tmp, p); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("replacing %s: %w", p, err)
 	}
 	return nil
 }

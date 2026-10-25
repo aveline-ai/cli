@@ -148,11 +148,13 @@ func getOrientationCmd() *cobra.Command {
 how the team works. Every workspace has one (seeded at creation,
 undeletable).
 
-The response carries two things, in reading order: "primer", Aveline's
-own base doc (how Aveline works, the words a person says to you, tags,
-with a version number), then "doc", the team's orientation. Where they
-disagree the team's doc wins. When the primer's version changes between
-runs the CLI says so once on stderr; stdout is always the JSON.
+The response carries two things: "primer", Aveline's own base doc (how
+Aveline works, the words a person says to you, tags, with a version
+number), and "doc", the team's orientation. Read the primer first; where
+they disagree the team's doc wins. When the primer's version changes
+between runs (per API URL) the CLI writes one JSON line to stderr,
+{"notice": "..."}, so a 2>&1 | jq pipeline still parses; stdout is
+always the response JSON.
 
 If you're an agent starting a session in an unfamiliar workspace, run
 this FIRST, then get-doc anything it links to that looks relevant.`,
@@ -173,7 +175,7 @@ this FIRST, then get-doc anything it links to that looks relevant.`,
 			raw, apiErr := client.Get(ctx,
 				fmt.Sprintf("/api/workspaces/%s/orientation", ws), nil)
 			if apiErr == nil {
-				notePrimerVersion(raw)
+				notePrimerVersion(raw, loadCfg().Resolve(flagAPIURL))
 			}
 			return handle(raw, apiErr)
 		},
@@ -196,20 +198,24 @@ func primerVersionOf(raw []byte) int {
 }
 
 // primerNotice is the one line to print when the base doc's version moved
-// since the last run. Nothing to say on first sight (prev == 0), when the
-// server sent no primer (cur == 0), or when nothing changed.
+// since the last run, as a JSON object so a `2>&1 | jq` pipeline still
+// parses. Nothing to say on first sight (prev == 0), when the server sent
+// no primer (cur == 0), or when nothing changed.
 func primerNotice(prev, cur int) (string, bool) {
 	if prev == 0 || cur == 0 || prev == cur {
 		return "", false
 	}
-	return fmt.Sprintf("Aveline base doc updated: v%d -> v%d. Re-read the orientation before relying on what you remember.", prev, cur), true
+	msg := fmt.Sprintf("Aveline base doc updated: v%d -> v%d. Re-read the orientation before relying on what you remember.", prev, cur)
+	line, _ := json.Marshal(map[string]string{"notice": msg})
+	return string(line), true
 }
 
 // notePrimerVersion compares the response's primer version with the one
-// stored in the config, prints the notice to stderr if it moved, and
-// stores the new one. Best effort: a config that cannot be read or written
-// never fails the command, since stdout still has the orientation.
-func notePrimerVersion(raw []byte) {
+// stored in the config for this API URL, stores the new one, and only then
+// prints the notice to stderr, so a config that cannot be written stays
+// silent instead of nagging every run. Best effort: nothing here fails the
+// command, since stdout still has the orientation.
+func notePrimerVersion(raw []byte, apiURL string) {
 	cur := primerVersionOf(raw)
 	if cur == 0 {
 		return
@@ -218,12 +224,15 @@ func notePrimerVersion(raw []byte) {
 	if err != nil {
 		return
 	}
-	if msg, ok := primerNotice(cfg.PrimerVersion, cur); ok {
-		fmt.Fprintln(os.Stderr, msg)
+	prev := cfg.PrimerVersion(apiURL)
+	if prev == cur {
+		return
 	}
-	if cfg.PrimerVersion != cur {
-		cfg.PrimerVersion = cur
-		_ = config.Save(cfg)
+	if err := config.Save(cfg.WithPrimerVersion(apiURL, cur)); err != nil {
+		return
+	}
+	if msg, ok := primerNotice(prev, cur); ok {
+		fmt.Fprintln(os.Stderr, msg)
 	}
 }
 

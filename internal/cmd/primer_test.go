@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +32,9 @@ func TestPrimerNotice(t *testing.T) {
 			msg, ok := primerNotice(c.prev, c.cur)
 			assert.Equal(t, c.want, ok)
 			if ok {
-				assert.Contains(t, msg, "v"+itoa(c.prev)+" -> v"+itoa(c.cur))
+				var line map[string]string
+				assert.NoError(t, json.Unmarshal([]byte(msg), &line), "notice must be one JSON object")
+				assert.Contains(t, line["notice"], "v"+itoa(c.prev)+" -> v"+itoa(c.cur))
 			} else {
 				assert.Empty(t, msg)
 			}

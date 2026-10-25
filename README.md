@@ -177,4 +177,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Orientation
 
-`get-orientation` returns `primer` (Aveline's own base doc, with a version) ahead of `doc` (the workspace's orientation). The workspace doc wins where they disagree. When the primer's version changes between runs the CLI prints one line to stderr; stdout is always the JSON.
+`get-orientation` returns `primer` (Aveline's own base doc, with a version) and `doc` (the workspace's orientation). Read the primer first; the workspace doc wins where they disagree. When the primer's version changes between runs (per API URL) the CLI writes one JSON line to stderr, `{"notice": "..."}`; stdout is always the response JSON.
