@@ -28,6 +28,27 @@ type Config struct {
 	APIURL    string `toml:"api_url,omitempty"`
 	Token     string `toml:"token,omitempty"`
 	Workspace string `toml:"workspace,omitempty"`
+	// PrimerVersions is, per API URL, the version of Aveline's base doc
+	// (the "primer") last seen in a get-orientation response, so the CLI
+	// can say once when it changes. Keyed by URL because a dev server and
+	// production can be at different versions. Absent means never seen.
+	PrimerVersions map[string]int `toml:"primer_versions,omitempty"`
+}
+
+// PrimerVersion is the primer version last seen from apiURL, or 0.
+func (c Config) PrimerVersion(apiURL string) int {
+	return c.PrimerVersions[apiURL]
+}
+
+// WithPrimerVersion returns a copy of c remembering v for apiURL.
+func (c Config) WithPrimerVersion(apiURL string, v int) Config {
+	m := make(map[string]int, len(c.PrimerVersions)+1)
+	for k, val := range c.PrimerVersions {
+		m[k] = val
+	}
+	m[apiURL] = v
+	c.PrimerVersions = m
+	return c
 }
 
 // Path returns the resolved absolute path to the config file. It does not
@@ -65,25 +86,75 @@ func Load() (Config, error) {
 }
 
 // Save writes the config file with 0600 permissions, creating the parent
-// directory if necessary.
+// directory if necessary. It prefers an atomic write (a temp file in the
+// same directory, then rename, through any symlink) so a concurrent Load
+// never sees a truncated file; where the directory itself is not
+// writable but the file is, it falls back to writing in place.
 func Save(c Config) error {
 	p, err := Path()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil && !os.IsExist(err) && !os.IsPermission(err) {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		p = real
+	}
+	sweepTemps(filepath.Dir(p))
+	if err := saveAtomic(p, c); err == nil {
+		return nil
+	}
+	return saveInPlace(p, c)
+}
+
+func saveAtomic(p string, c Config) error {
+	f, err := os.CreateTemp(filepath.Dir(p), tempPrefix+"*.toml")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if err := f.Chmod(0o600); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := toml.NewEncoder(f).Encode(c); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("encoding config: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, p); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+func saveInPlace(p string, c Config) error {
 	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("opening %s: %w", p, err)
 	}
 	defer f.Close()
-	enc := toml.NewEncoder(f)
-	if err := enc.Encode(c); err != nil {
+	if err := toml.NewEncoder(f).Encode(c); err != nil {
 		return fmt.Errorf("encoding config: %w", err)
 	}
 	return nil
+}
+
+const tempPrefix = ".config-"
+
+// sweepTemps removes temp files a killed Save may have left behind.
+func sweepTemps(dir string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, tempPrefix+"*.toml"))
+	for _, m := range matches {
+		_ = os.Remove(m)
+	}
 }
 
 // Resolve produces the effective API URL given precedence:

@@ -29,7 +29,7 @@ func TestPathHomeFallback(t *testing.T) {
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod"}
+	in := Config{APIURL: "http://localhost:4000", Token: "avl_x", Workspace: "stable-pod", PrimerVersions: map[string]int{"http://localhost:4000": 4}}
 	require.NoError(t, Save(in))
 
 	p, _ := Path()
@@ -63,4 +63,62 @@ func TestResolvePrecedence(t *testing.T) {
 	t.Setenv("AVELINE_API_URL", "")
 	empty := Config{}
 	assert.Equal(t, DefaultAPIURL, empty.Resolve(""))
+}
+
+func TestPrimerVersionPerURL(t *testing.T) {
+	c := Config{}
+	assert.Equal(t, 0, c.PrimerVersion("https://a"))
+	c = c.WithPrimerVersion("https://a", 2).WithPrimerVersion("https://b", 5)
+	assert.Equal(t, 2, c.PrimerVersion("https://a"))
+	assert.Equal(t, 5, c.PrimerVersion("https://b"))
+	assert.Equal(t, 0, c.PrimerVersion("https://c"))
+}
+
+func TestSaveIsAtomicAndLeavesNoTemp(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	require.NoError(t, Save(Config{Token: "one"}))
+	require.NoError(t, Save(Config{Token: "two"}))
+	out, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "two", out.Token)
+	entries, err := os.ReadDir(filepath.Join(dir, "aveline"))
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "only config.toml should remain")
+}
+
+func TestSaveFallsBackWhenDirIsReadOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	require.NoError(t, Save(Config{Token: "one"}))
+	cfgDir := filepath.Join(dir, "aveline")
+	require.NoError(t, os.Chmod(cfgDir, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(cfgDir, 0o755) })
+	require.NoError(t, Save(Config{Token: "two"}), "writable file in a read-only dir must still save")
+	out, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "two", out.Token)
+}
+
+func TestSaveWritesThroughSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	cfgDir := filepath.Join(dir, "aveline")
+	require.NoError(t, os.MkdirAll(cfgDir, 0o700))
+	real := filepath.Join(dir, "real.toml")
+	require.NoError(t, os.WriteFile(real, []byte(""), 0o600))
+	require.NoError(t, os.Symlink(real, filepath.Join(cfgDir, "config.toml")))
+	require.NoError(t, Save(Config{Token: "via-link"}))
+	info, err := os.Lstat(filepath.Join(cfgDir, "config.toml"))
+	require.NoError(t, err)
+	assert.True(t, info.Mode()&os.ModeSymlink != 0, "symlink must survive")
+	data, err := os.ReadFile(real)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "via-link")
 }
