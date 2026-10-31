@@ -7,12 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPrimerVersionOf(t *testing.T) {
-	assert.Equal(t, 3, primerVersionOf([]byte(`{"ok":true,"primer":{"version":3,"blocks":[]},"doc":{}}`)))
-	assert.Equal(t, 0, primerVersionOf([]byte(`{"ok":true,"doc":{}}`)), "older server, no primer")
-	assert.Equal(t, 0, primerVersionOf([]byte(`{"ok":true,"primer":{"version":0}}`)))
-	assert.Equal(t, 0, primerVersionOf([]byte(`{"ok":true,"primer":{"version":"3"}}`)), "wrong type")
-	assert.Equal(t, 0, primerVersionOf([]byte(`not json`)))
+func versionOf(raw string) int { v, _ := primerOf([]byte(raw)); return v }
+
+func TestPrimerOf(t *testing.T) {
+	assert.Equal(t, 3, versionOf(`{"ok":true,"primer":{"version":3,"blocks":[]},"doc":{}}`))
+	assert.Equal(t, 0, versionOf(`{"ok":true,"doc":{}}`), "older server, no primer")
+	assert.Equal(t, 0, versionOf(`{"ok":true,"primer":{"version":0}}`))
+	assert.Equal(t, 0, versionOf(`{"ok":true,"primer":{"version":"3"}}`), "wrong type")
+	assert.Equal(t, 0, versionOf(`not json`))
+
+	v, log := primerOf([]byte(`{"primer":{"version":3,"changelog":[{"version":1,"line":"First."},{"version":3,"line":"Tags out."}]}}`))
+	assert.Equal(t, 3, v)
+	assert.Len(t, log, 2)
+	assert.Equal(t, []string{"Tags out."}, changesBetween(log, 2, 3), "only what is newer than what we saw")
+	assert.Empty(t, changesBetween(log, 3, 3))
 }
 
 func TestPrimerNotice(t *testing.T) {
@@ -29,12 +37,12 @@ func TestPrimerNotice(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			msg, ok := primerNotice(c.prev, c.cur)
+			msg, ok := primerNotice(c.prev, c.cur, nil)
 			assert.Equal(t, c.want, ok)
 			if ok {
 				var line map[string]string
 				assert.NoError(t, json.Unmarshal([]byte(msg), &line), "notice must be one JSON object")
-				assert.Contains(t, line["notice"], "v"+itoa(c.prev)+" -> v"+itoa(c.cur))
+				assert.Contains(t, line["notice"], "v"+itoa(c.prev)+" to v"+itoa(c.cur))
 			} else {
 				assert.Empty(t, msg)
 			}

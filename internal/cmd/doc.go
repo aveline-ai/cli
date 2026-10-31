@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/aveline-ai/cli/internal/config"
@@ -183,34 +184,62 @@ this FIRST, then get-doc anything it links to that looks relevant.`,
 	}
 }
 
-// primerVersionOf pulls primer.version out of a get-orientation response.
-// Zero when the server sent no primer (an older server) or the field is
-// not a positive integer.
-func primerVersionOf(raw []byte) int {
+// primerChange is one line of the base doc's changelog.
+type primerChange struct {
+	Version int    `json:"version"`
+	Line    string `json:"line"`
+}
+
+// primerOf pulls the base doc's version and changelog out of a
+// get-orientation response. Version is zero when the server sent no
+// primer (an older server) or the field is not a positive integer.
+func primerOf(raw []byte) (int, []primerChange) {
 	var env struct {
 		Primer struct {
-			Version int `json:"version"`
+			Version   int            `json:"version"`
+			Changelog []primerChange `json:"changelog"`
 		} `json:"primer"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil || env.Primer.Version < 1 {
-		return 0
+		return 0, nil
 	}
-	return env.Primer.Version
+	return env.Primer.Version, env.Primer.Changelog
+}
+
+// changesBetween returns the changelog lines newer than prev and no newer
+// than cur, oldest first, so the reader sees what actually changed.
+func changesBetween(log []primerChange, prev, cur int) []string {
+	var picked []primerChange
+	for _, c := range log {
+		if c.Version > prev && c.Version <= cur && c.Line != "" {
+			picked = append(picked, c)
+		}
+	}
+	sort.Slice(picked, func(i, j int) bool { return picked[i].Version < picked[j].Version })
+	out := make([]string, 0, len(picked))
+	for _, c := range picked {
+		out = append(out, c.Line)
+	}
+	return out
 }
 
 // primerNotice is the one line to print when the base doc's version moved
 // since the last run, as a JSON object so a `2>&1 | jq` pipeline still
 // parses. Nothing to say on first sight (prev == 0), when the server sent
 // no primer (cur == 0), or when nothing changed.
-func primerNotice(prev, cur int) (string, bool) {
+func primerNotice(prev, cur int, changes []string) (string, bool) {
 	if prev == 0 || cur == 0 || prev == cur {
 		return "", false
 	}
-	msg := fmt.Sprintf("Aveline base doc updated: v%d -> v%d. Re-read the orientation before relying on what you remember.", prev, cur)
+	msg := fmt.Sprintf("Aveline base doc updated: v%d to v%d. Re-read the orientation before relying on what you remember.", prev, cur)
+	payload := map[string]any{"notice": msg}
+	if len(changes) > 0 {
+		payload["changes"] = changes
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false) // keep "->" readable on a raw stderr
-	_ = enc.Encode(map[string]string{"notice": msg})
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(payload)
 	return strings.TrimRight(buf.String(), "\n"), true
 }
 
@@ -220,7 +249,7 @@ func primerNotice(prev, cur int) (string, bool) {
 // silent instead of nagging every run. Best effort: nothing here fails the
 // command, since stdout still has the orientation.
 func notePrimerVersion(raw []byte, apiURL string) {
-	cur := primerVersionOf(raw)
+	cur, log := primerOf(raw)
 	if cur == 0 {
 		return
 	}
@@ -235,7 +264,7 @@ func notePrimerVersion(raw []byte, apiURL string) {
 	if err := config.Save(cfg.WithPrimerVersion(apiURL, cur)); err != nil {
 		return
 	}
-	if msg, ok := primerNotice(prev, cur); ok {
+	if msg, ok := primerNotice(prev, cur, changesBetween(log, prev, cur)); ok {
 		fmt.Fprintln(os.Stderr, msg)
 	}
 }
