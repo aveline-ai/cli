@@ -110,7 +110,9 @@ Categorized for readability; on the CLI they're all flat.
 `revoke-key`
 
 ### Workspaces
-`list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`
+`list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`, `starter`
+
+`create-workspace --setup standard|custom` decides how far a new workspace is furnished. `starter` prints what either would write, without creating anything.
 
 ### Docs
 `list-docs`, `get-doc`, `create-doc`, `edit-doc`, `delete-doc`,

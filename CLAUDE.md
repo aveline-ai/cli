@@ -15,6 +15,7 @@ Common chains:
 ```sh
 # Inspect
 aveline whoami
+aveline starter               # what a new workspace would be set up with, without creating one
 aveline list-docs --tag runbook --pinned
 aveline get-doc <slug>
 aveline list-comments <slug>
