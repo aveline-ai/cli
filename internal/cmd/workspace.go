@@ -45,12 +45,22 @@ func getWorkspaceCmd() *cobra.Command {
 }
 
 func createWorkspaceCmd() *cobra.Command {
-	var name, slug string
+	var name, slug, setup string
 
 	c := &cobra.Command{
-		Use:          "create-workspace",
-		Short:        "Create a workspace and add yourself as a member.",
-		Example:      `  aveline create-workspace --name "Aveline AI"`,
+		Use:   "create-workspace",
+		Short: "Create a workspace and add yourself as a member.",
+		Long: `Create a workspace and add yourself as a member.
+
+Every new workspace gets an orientation doc. --setup decides what is in
+it. "standard" (the default) writes a loop that works on day one and
+creates the tags and boards it refers to; "custom" writes the same frame
+with nothing filled in, and creates nothing else.
+
+Run ` + "`aveline starter`" + ` first to read exactly what standard would write.
+Either way it is the team's doc afterwards, to rewrite as they like.`,
+		Example: `  aveline create-workspace --name "Aveline AI"
+  aveline create-workspace --name "Aveline AI" --setup custom`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
@@ -61,6 +71,9 @@ func createWorkspaceCmd() *cobra.Command {
 			if slug != "" {
 				body["slug"] = slug
 			}
+			if setup != "" {
+				body["setup"] = setup
+			}
 			ctx, cancel := withTimeout()
 			defer cancel()
 			raw, apiErr := client.Post(ctx, "/api/workspaces", body)
@@ -70,6 +83,7 @@ func createWorkspaceCmd() *cobra.Command {
 
 	c.Flags().StringVar(&name, "name", "", "Workspace display name (required).")
 	c.Flags().StringVar(&slug, "slug", "", "Workspace URL slug (optional; derived from name if omitted).")
+	c.Flags().StringVar(&setup, "setup", "", `How far to furnish it: "standard" (default) or "custom".`)
 	_ = c.MarkFlagRequired("name")
 	return c
 }

@@ -80,6 +80,7 @@ publish deliberately with --visibility workspace / --bucket team.`,
 	root.AddCommand(getDocCmd())
 	root.AddCommand(getOrientationCmd())
 	root.AddCommand(contractCmd())
+	root.AddCommand(starterCmd())
 	root.AddCommand(createDocCmd())
 	root.AddCommand(editDocCmd())
 	root.AddCommand(pinDocCmd())
