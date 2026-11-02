@@ -45,34 +45,33 @@ func getWorkspaceCmd() *cobra.Command {
 }
 
 func createWorkspaceCmd() *cobra.Command {
-	var name, slug, setup string
+	var name, slug, template string
 
 	c := &cobra.Command{
 		Use:   "create-workspace",
-		Short: "Create a workspace and add yourself as a member.",
+		Short: "Create a workspace from a template and add yourself as a member.",
 		Long: `Create a workspace and add yourself as a member.
 
-Every new workspace gets an orientation doc. --setup decides what is in
-it. "standard" (the default) writes a loop that works on day one and
-creates the tags and boards it refers to; "custom" writes the same frame
-with nothing filled in, and creates nothing else.
+Every workspace starts from a template, so --template is required. The
+templates are "autonomous-dev" (recommended: a loop that works on day
+one, with the tags and views it refers to), "knowledge-base" (a shared
+wiki with tags and views for team knowledge) and "blank" (an orientation
+frame with nothing filled in).
 
-Run ` + "`aveline starter`" + ` first to read exactly what standard would write.
-Either way it is the team's doc afterwards, to rewrite as they like.`,
-		Example: `  aveline create-workspace --name "Aveline AI"
-  aveline create-workspace --name "Aveline AI" --setup custom`,
+` + "`aveline templates`" + ` lists them; ` + "`aveline templates <name>`" + ` shows exactly
+what one would create. After creation it is the team's own orientation
+doc and tags, to reshape as they like.`,
+		Example: `  aveline create-workspace --name "Aveline AI" --template autonomous-dev
+  aveline create-workspace --name "Aveline AI" --template blank`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := resolveAPI(false)
 			if err != nil {
 				return err
 			}
-			body := map[string]any{"name": name}
+			body := map[string]any{"name": name, "template": template}
 			if slug != "" {
 				body["slug"] = slug
-			}
-			if setup != "" {
-				body["setup"] = setup
 			}
 			ctx, cancel := withTimeout()
 			defer cancel()
@@ -83,8 +82,9 @@ Either way it is the team's doc afterwards, to rewrite as they like.`,
 
 	c.Flags().StringVar(&name, "name", "", "Workspace display name (required).")
 	c.Flags().StringVar(&slug, "slug", "", "Workspace URL slug (optional; derived from name if omitted).")
-	c.Flags().StringVar(&setup, "setup", "", `How far to furnish it: "standard" (default) or "custom".`)
+	c.Flags().StringVar(&template, "template", "", `Template to start from (required): "autonomous-dev", "knowledge-base" or "blank". See `+"`aveline templates`"+`.`)
 	_ = c.MarkFlagRequired("name")
+	_ = c.MarkFlagRequired("template")
 	return c
 }
 

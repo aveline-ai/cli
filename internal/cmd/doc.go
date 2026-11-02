@@ -148,7 +148,13 @@ how the team works. Every workspace has one (seeded at creation,
 undeletable).
 
 If you're an agent starting a session in an unfamiliar workspace, run
-this FIRST, then get-doc anything it links to that looks relevant.`,
+this FIRST, then get-doc anything it links to that looks relevant.
+
+Besides the doc, the response carries "guide" (a short summary of
+Aveline's own guide, with its version), "template" (which template the
+workspace started from, or null) and "first_session" (true the first
+time you fetch it here: that is your cue to run ` + "`aveline guide`" + ` and
+give the person a plain-words 101).`,
 		Example:      `  aveline get-orientation`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
@@ -283,7 +289,7 @@ func editDocCmd() *cobra.Command {
 	var (
 		slug, blocksPath, opsPath, intent, dispositionsPath, actor string
 		tags                                                       []string
-		title, summary                                            string
+		title, summary                                             string
 	)
 
 	c := &cobra.Command{
