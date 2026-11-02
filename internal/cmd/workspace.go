@@ -54,9 +54,10 @@ func createWorkspaceCmd() *cobra.Command {
 
 Every workspace starts from a template, so --template is required. The
 templates are "autonomous-dev" (recommended: a loop that works on day
-one, with the tags and views it refers to), "knowledge-base" (a shared
-wiki with tags and views for team knowledge) and "blank" (an orientation
-frame with nothing filled in).
+one, with the tags and boards it refers to, and how a person hands work
+to an agent), "knowledge-base" (durable team knowledge: product,
+architecture, briefs, tips, runbooks and oncall, with a tickets board)
+and "blank" (the orientation frame with nothing filled in).
 
 ` + "`aveline templates`" + ` lists them; ` + "`aveline templates <name>`" + ` shows exactly
 what one would create. After creation it is the team's own orientation

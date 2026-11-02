@@ -98,8 +98,8 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 `invalid_disposition_action`, `comment_not_found`, `self_kudos`,
 `self_remove`, `already_member`, `not_member`, `not_user_deleted`,
 `would_orphan_docs`, `stale_version`, `query_not_found`, `last_key`,
-`list_param_invalid`,
-`unknown_authors`, `internal_error`.
+`list_param_invalid`, `unknown_authors`, `template_required`,
+`template_invalid`, `internal_error`.
 
 ## Verbs
 
