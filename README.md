@@ -98,8 +98,8 @@ Error code catalog: `unauthorized`, `forbidden`, `workspace_not_found`,
 `invalid_disposition_action`, `comment_not_found`, `self_kudos`,
 `self_remove`, `already_member`, `not_member`, `not_user_deleted`,
 `would_orphan_docs`, `stale_version`, `query_not_found`, `last_key`,
-`list_param_invalid`,
-`unknown_authors`, `internal_error`.
+`list_param_invalid`, `unknown_authors`, `template_required`,
+`template_invalid`, `internal_error`.
 
 ## Verbs
 
@@ -110,7 +110,9 @@ Categorized for readability; on the CLI they're all flat.
 `revoke-key`
 
 ### Workspaces
-`list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`
+`list-workspaces`, `get-workspace`, `create-workspace`, `use-workspace`, `templates`, `guide`
+
+`create-workspace --template <name>` starts a workspace from a template (`autonomous-dev`, `knowledge-base` or `blank`). `templates` lists them, and `templates <name>` shows exactly what one would create, without creating anything. `guide` prints Aveline's own versioned guide to using Aveline.
 
 ### Docs
 `list-docs`, `get-doc`, `create-doc`, `edit-doc`, `delete-doc`,

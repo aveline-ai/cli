@@ -45,7 +45,11 @@ process exit code groups them (2 = validation, 3 = auth, 4 = not
 found, 1 = network / other).
 
 START HERE (agents): run these before anything else —
-  aveline get-orientation   how this workspace organizes its knowledge
+  aveline guide             how Aveline itself works (read it on a first
+                            session in a workspace, or when the person
+                            asks how Aveline works)
+  aveline get-orientation   how THIS workspace organizes its knowledge
+                            (the team's doc wins over the guide)
   aveline contract          every doc block type and edit op, with a
                             valid example (required reading before your
                             first create-doc or edit-doc)
@@ -80,6 +84,8 @@ publish deliberately with --visibility workspace / --bucket team.`,
 	root.AddCommand(getDocCmd())
 	root.AddCommand(getOrientationCmd())
 	root.AddCommand(contractCmd())
+	root.AddCommand(guideCmd())
+	root.AddCommand(templatesCmd())
 	root.AddCommand(createDocCmd())
 	root.AddCommand(editDocCmd())
 	root.AddCommand(pinDocCmd())

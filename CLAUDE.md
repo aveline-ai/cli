@@ -15,6 +15,9 @@ Common chains:
 ```sh
 # Inspect
 aveline whoami
+aveline guide                 # how Aveline itself works; read on a first session or when asked
+aveline templates [<name>]    # the templates a workspace can start from; <name> shows exactly what one creates
+aveline create-workspace --name "..." --template <name>   # autonomous-dev, knowledge-base or blank
 aveline list-docs --tag runbook --pinned
 aveline get-doc <slug>
 aveline list-comments <slug>
